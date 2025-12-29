@@ -1,6 +1,6 @@
 {
   "name": "filehub",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Gerenciador de Sessoes Compartilhadas",
   "main": "main.js",
   "scripts": {
@@ -15,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/seu-usuario/filehub.git"
+    "url": "https://github.com/LisboaCodes/filehub-app.git"
   },
   "keywords": [
     "electron",
@@ -44,14 +44,18 @@
       {
         "from": "assets",
         "to": "assets",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "${productName}-Setup-${version}.${ext}"
@@ -67,7 +71,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "category": "public.app-category.productivity",
@@ -86,8 +93,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "seu-usuario",
-      "repo": "filehub",
+      "owner": "LisboaCodes",
+      "repo": "filehub-app",
       "releaseType": "release"
     }
   },
