@@ -7,7 +7,7 @@ const { autoUpdater } = require('electron-updater');
 const Database = require('./src/database');
 
 // Configuracao do auto-updater
-autoUpdater.autoDownload = false;
+autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
 // Usuario logado atualmente
@@ -603,25 +603,11 @@ function setupAutoUpdater() {
     console.log('Erro ao verificar atualizacoes:', err.message);
   });
 
-  // Atualizacao disponivel
+  // Atualizacao disponivel - inicia download automaticamente
   autoUpdater.on('update-available', (info) => {
     console.log('Atualizacao disponivel:', info.version);
-
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Atualizacao Disponivel',
-      message: `Uma nova versao (${info.version}) esta disponivel!`,
-      detail: 'Deseja baixar e instalar agora?',
-      buttons: ['Baixar Agora', 'Depois'],
-      defaultId: 0,
-      cancelId: 1
-    }).then(result => {
-      if (result.response === 0) {
-        autoUpdater.downloadUpdate();
-        // Notifica o renderer
-        mainWindow?.webContents.send('update:downloading');
-      }
-    });
+    // Notifica o renderer para mostrar overlay
+    mainWindow?.webContents.send('update:available', info);
   });
 
   // Nenhuma atualizacao disponivel
@@ -635,28 +621,21 @@ function setupAutoUpdater() {
     mainWindow?.webContents.send('update:progress', progress);
   });
 
-  // Download concluido
+  // Download concluido - instala automaticamente
   autoUpdater.on('update-downloaded', (info) => {
     console.log('Atualizacao baixada:', info.version);
+    mainWindow?.webContents.send('update:downloaded', info);
 
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Atualizacao Pronta',
-      message: 'A atualizacao foi baixada!',
-      detail: 'O aplicativo sera reiniciado para instalar a atualizacao.',
-      buttons: ['Reiniciar Agora', 'Depois'],
-      defaultId: 0,
-      cancelId: 1
-    }).then(result => {
-      if (result.response === 0) {
-        autoUpdater.quitAndInstall();
-      }
-    });
+    // Aguarda 2 segundos e instala automaticamente
+    setTimeout(() => {
+      autoUpdater.quitAndInstall(true, true);
+    }, 2000);
   });
 
   // Erro no update
   autoUpdater.on('error', (err) => {
     console.error('Erro no auto-updater:', err.message);
+    mainWindow?.webContents.send('update:error', err.message);
   });
 }
 

@@ -11,8 +11,10 @@ contextBridge.exposeInMainWorld('api', {
   downloadUpdate: () => ipcRenderer.invoke('update:download'),
   installUpdate: () => ipcRenderer.invoke('update:install'),
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
+  onUpdateAvailable: (callback) => ipcRenderer.on('update:available', (event, info) => callback(info)),
   onUpdateProgress: (callback) => ipcRenderer.on('update:progress', (event, progress) => callback(progress)),
-  onUpdateDownloading: (callback) => ipcRenderer.on('update:downloading', () => callback()),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update:downloaded', (event, info) => callback(info)),
+  onUpdateError: (callback) => ipcRenderer.on('update:error', (event, error) => callback(error)),
 
   // Categories
   getCategories: () => ipcRenderer.invoke('db:getCategories'),

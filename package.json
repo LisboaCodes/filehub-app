@@ -1,6 +1,6 @@
 {
   "name": "filehub",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Gerenciador de Sessoes Compartilhadas",
   "main": "main.js",
   "scripts": {
@@ -62,15 +62,16 @@
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "FileHub",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
-      "license": "LICENSE"
+      "perMachine": false,
+      "allowElevation": true
     },
     "mac": {
       "target": [

@@ -15,6 +15,14 @@ const userExpiryEl = document.getElementById('userExpiry');
 const userAvatarEl = document.getElementById('userAvatar');
 const pageTitleEl = document.getElementById('pageTitle');
 
+// Elementos do update overlay
+const updateOverlay = document.getElementById('updateOverlay');
+const updateTitle = document.getElementById('updateTitle');
+const updateMessage = document.getElementById('updateMessage');
+const updateProgressBar = document.getElementById('updateProgressBar');
+const updatePercent = document.getElementById('updatePercent');
+const updateStatus = document.getElementById('updateStatus');
+
 // Inicializacao
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('FileHub iniciando...');
@@ -23,7 +31,60 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   setupNavigation();
   setupProfilePage();
+  setupUpdateListeners();
 });
+
+// Configura listeners de atualizacao automatica
+function setupUpdateListeners() {
+  // Atualizacao disponivel
+  window.api.onUpdateAvailable((info) => {
+    console.log('Atualizacao disponivel:', info.version);
+    showUpdateOverlay();
+    updateTitle.textContent = 'Atualizando FileHub';
+    updateMessage.textContent = `Baixando versao ${info.version}...`;
+    updateStatus.textContent = 'Iniciando download...';
+  });
+
+  // Progresso do download
+  window.api.onUpdateProgress((progress) => {
+    const percent = Math.round(progress.percent);
+    updateProgressBar.style.width = percent + '%';
+    updatePercent.textContent = percent + '%';
+
+    const mbDownloaded = (progress.transferred / 1024 / 1024).toFixed(1);
+    const mbTotal = (progress.total / 1024 / 1024).toFixed(1);
+    updateStatus.textContent = `${mbDownloaded} MB de ${mbTotal} MB`;
+  });
+
+  // Download concluido
+  window.api.onUpdateDownloaded((info) => {
+    updateTitle.textContent = 'Atualizacao Pronta!';
+    updateMessage.textContent = 'Instalando...';
+    updatePercent.textContent = '100%';
+    updateProgressBar.style.width = '100%';
+    updateStatus.textContent = 'O app sera reiniciado automaticamente';
+  });
+
+  // Erro na atualizacao
+  window.api.onUpdateError((error) => {
+    console.error('Erro na atualizacao:', error);
+    hideUpdateOverlay();
+  });
+}
+
+// Mostra overlay de atualizacao
+function showUpdateOverlay() {
+  if (updateOverlay) {
+    updateOverlay.classList.add('active');
+  }
+}
+
+// Esconde overlay de atualizacao
+function hideUpdateOverlay() {
+  if (updateOverlay) {
+    updateOverlay.classList.remove('active');
+  }
+}
 
 // Carrega informacoes do usuario logado
 async function loadUserInfo() {
