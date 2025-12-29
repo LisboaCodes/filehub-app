@@ -1,14 +1,19 @@
 // Estado da aplicacao
 let ferramentas = [];
 let currentUser = null;
+let currentPage = 'ferramentas';
 
 // Elementos DOM
 const cardsGrid = document.getElementById('cardsGrid');
 const connectionStatus = document.getElementById('connectionStatus');
 const descriptionModal = document.getElementById('descriptionModal');
+const avatarModal = document.getElementById('avatarModal');
 const loadingOverlay = document.getElementById('loadingOverlay');
 const userNameEl = document.getElementById('userName');
+const userPlanEl = document.getElementById('userPlan');
 const userExpiryEl = document.getElementById('userExpiry');
+const userAvatarEl = document.getElementById('userAvatar');
+const pageTitleEl = document.getElementById('pageTitle');
 
 // Inicializacao
 document.addEventListener('DOMContentLoaded', async () => {
@@ -16,6 +21,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadUserInfo();
   await loadFerramentas();
   setupEventListeners();
+  setupNavigation();
+  setupProfilePage();
 });
 
 // Carrega informacoes do usuario logado
@@ -23,9 +30,14 @@ async function loadUserInfo() {
   try {
     currentUser = await window.api.getCurrentUser();
     if (currentUser) {
-      // Mostra nome e plano
-      userNameEl.textContent = `${currentUser.name} (${currentUser.plano_nome || 'Plano'})`;
+      // Nome do usuario
+      userNameEl.textContent = currentUser.name || 'Usuario';
+      userPlanEl.textContent = currentUser.plano_nome || 'Plano';
 
+      // Avatar
+      updateAvatarDisplay();
+
+      // Expiracao
       if (currentUser.data_expiracao) {
         const expiry = new Date(currentUser.data_expiracao);
         userExpiryEl.textContent = 'Expira em: ' + expiry.toLocaleDateString('pt-BR');
@@ -37,6 +49,36 @@ async function loadUserInfo() {
     }
   } catch (error) {
     console.error('Erro ao carregar usuario:', error);
+  }
+}
+
+// Atualiza exibicao do avatar em todos os lugares
+function updateAvatarDisplay() {
+  if (!currentUser) return;
+
+  const avatarLetter = (currentUser.name || 'U').charAt(0).toUpperCase();
+
+  // Avatar na sidebar
+  if (currentUser.avatar) {
+    userAvatarEl.innerHTML = `<img src="${currentUser.avatar}" alt="Avatar">`;
+  } else {
+    userAvatarEl.innerHTML = `<span>${avatarLetter}</span>`;
+  }
+
+  // Avatar no perfil
+  const profileAvatarLetter = document.getElementById('profileAvatarLetter');
+  const profileAvatarImg = document.getElementById('profileAvatarImg');
+
+  if (profileAvatarLetter && profileAvatarImg) {
+    if (currentUser.avatar) {
+      profileAvatarLetter.style.display = 'none';
+      profileAvatarImg.src = currentUser.avatar;
+      profileAvatarImg.style.display = 'block';
+    } else {
+      profileAvatarLetter.style.display = 'block';
+      profileAvatarLetter.textContent = avatarLetter;
+      profileAvatarImg.style.display = 'none';
+    }
   }
 }
 
@@ -78,7 +120,7 @@ function renderCards() {
   if (ferramentas.length === 0) {
     cardsGrid.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">📂</div>
+        <div class="empty-state-icon">&#128194;</div>
         <h3>Nenhuma ferramenta encontrada</h3>
         <p>Verifique a conexao com o banco de dados</p>
       </div>
@@ -105,9 +147,9 @@ function renderCards() {
         <div class="card-cover">
           ${capaUrl
             ? `<img src="${escapeHtml(capaUrl)}" alt="${escapeHtml(f.titulo)}" class="card-img">`
-            : '<div class="card-cover-placeholder">🔧</div>'
+            : '<div class="card-cover-placeholder">&#128295;</div>'
           }
-          ${!f.temAcesso ? '<div class="card-lock-overlay"><span class="lock-icon">🔒</span></div>' : ''}
+          ${!f.temAcesso ? '<div class="card-lock-overlay"><span class="lock-icon">&#128274;</span></div>' : ''}
         </div>
         <div class="card-body">
           <span class="card-status ${f.status}">${getStatusLabel(f.status)}</span>
@@ -129,7 +171,7 @@ function renderCards() {
   // Adiciona handler para erros de imagem
   document.querySelectorAll('.card-img').forEach(img => {
     img.addEventListener('error', function() {
-      this.parentElement.innerHTML = '<div class="card-cover-placeholder">🔧</div>';
+      this.parentElement.innerHTML = '<div class="card-cover-placeholder">&#128295;</div>';
     });
   });
 }
@@ -139,7 +181,7 @@ function getBotaoAcesso(ferramenta) {
   // Se usuario nao tem acesso
   if (!ferramenta.temAcesso) {
     return `<button class="btn btn-locked btn-small" data-id="${ferramenta.id}" disabled>
-      <span class="btn-lock-icon">🔒</span> Upgrade
+      <span class="btn-lock-icon">&#128274;</span> Upgrade
     </button>`;
   }
 
@@ -150,12 +192,12 @@ function getBotaoAcesso(ferramenta) {
 
     case 'manutencao':
       return `<button class="btn btn-warning btn-small" data-id="${ferramenta.id}" disabled>
-        <span>⚠️</span> Manutencao
+        <span>&#9888;</span> Manutencao
       </button>`;
 
     case 'offline':
       return `<button class="btn btn-offline btn-small" data-id="${ferramenta.id}" disabled>
-        <span>⛔</span> Offline
+        <span>&#9940;</span> Offline
       </button>`;
 
     default:
@@ -171,6 +213,200 @@ function getStatusLabel(status) {
     case 'offline': return 'Offline';
     default: return status;
   }
+}
+
+// Configurar navegacao da sidebar
+function setupNavigation() {
+  const navItems = document.querySelectorAll('.nav-item');
+
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const page = item.dataset.page;
+      navigateTo(page);
+    });
+  });
+}
+
+// Navegar para uma pagina
+function navigateTo(page) {
+  currentPage = page;
+
+  // Atualiza navegacao ativa
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.page === page);
+  });
+
+  // Esconde todas as paginas
+  document.getElementById('pageFerramentas').classList.add('hidden');
+  document.getElementById('pagePerfil').classList.add('hidden');
+
+  // Mostra a pagina selecionada
+  if (page === 'ferramentas') {
+    document.getElementById('pageFerramentas').classList.remove('hidden');
+    pageTitleEl.textContent = 'Ferramentas';
+    connectionStatus.classList.remove('hidden');
+  } else if (page === 'perfil') {
+    document.getElementById('pagePerfil').classList.remove('hidden');
+    pageTitleEl.textContent = 'Meu Perfil';
+    connectionStatus.classList.add('hidden');
+    loadProfileData();
+  }
+}
+
+// Carrega dados do perfil
+function loadProfileData() {
+  if (!currentUser) return;
+
+  document.getElementById('profileName').textContent = currentUser.name || 'Usuario';
+  document.getElementById('profileEmail').textContent = currentUser.email || '';
+  document.getElementById('inputEmail').value = currentUser.email || '';
+  document.getElementById('inputWhatsapp').value = currentUser.whatsapp || '';
+  document.getElementById('inputPin').value = '';
+  document.getElementById('inputNewPassword').value = '';
+  document.getElementById('inputConfirmPassword').value = '';
+
+  updateAvatarDisplay();
+}
+
+// Configurar pagina de perfil
+function setupProfilePage() {
+  // Botao editar avatar
+  document.getElementById('btnEditAvatar').addEventListener('click', () => {
+    avatarModal.classList.add('active');
+    document.getElementById('inputAvatarUrl').value = currentUser?.avatar || '';
+    updateAvatarPreview();
+  });
+
+  // Fechar modal avatar
+  document.getElementById('closeAvatarModal').addEventListener('click', () => {
+    avatarModal.classList.remove('active');
+  });
+
+  document.getElementById('btnCancelAvatar').addEventListener('click', () => {
+    avatarModal.classList.remove('active');
+  });
+
+  avatarModal.addEventListener('click', (e) => {
+    if (e.target === avatarModal) {
+      avatarModal.classList.remove('active');
+    }
+  });
+
+  // Preview do avatar
+  document.getElementById('inputAvatarUrl').addEventListener('input', updateAvatarPreview);
+
+  // Salvar avatar
+  document.getElementById('btnSaveAvatar').addEventListener('click', async () => {
+    const url = document.getElementById('inputAvatarUrl').value.trim();
+    await saveAvatar(url);
+  });
+
+  // Salvar perfil
+  document.getElementById('btnSaveProfile').addEventListener('click', async () => {
+    await saveProfile();
+  });
+}
+
+// Atualiza preview do avatar
+function updateAvatarPreview() {
+  const url = document.getElementById('inputAvatarUrl').value.trim();
+  const preview = document.getElementById('avatarPreview');
+
+  if (url) {
+    preview.innerHTML = `<img src="${url}" alt="Preview" onerror="this.parentElement.innerHTML='<span>Erro ao carregar</span>'">`;
+  } else {
+    preview.innerHTML = '<span>Preview</span>';
+  }
+}
+
+// Salvar avatar
+async function saveAvatar(url) {
+  try {
+    const result = await window.api.updateProfile({ avatar: url });
+
+    if (result.success) {
+      currentUser.avatar = url;
+      updateAvatarDisplay();
+      avatarModal.classList.remove('active');
+      showProfileMessage('Avatar atualizado com sucesso!', 'success');
+    } else {
+      showProfileMessage(result.error || 'Erro ao salvar avatar', 'error');
+    }
+  } catch (error) {
+    console.error('Erro ao salvar avatar:', error);
+    showProfileMessage('Erro ao salvar avatar', 'error');
+  }
+}
+
+// Salvar perfil
+async function saveProfile() {
+  const whatsapp = document.getElementById('inputWhatsapp').value.trim();
+  const pin = document.getElementById('inputPin').value.trim();
+  const newPassword = document.getElementById('inputNewPassword').value;
+  const confirmPassword = document.getElementById('inputConfirmPassword').value;
+
+  // Validacoes
+  if (pin && pin.length !== 4) {
+    showProfileMessage('O PIN deve ter exatamente 4 digitos', 'error');
+    return;
+  }
+
+  if (pin && !/^\d{4}$/.test(pin)) {
+    showProfileMessage('O PIN deve conter apenas numeros', 'error');
+    return;
+  }
+
+  if (newPassword && newPassword !== confirmPassword) {
+    showProfileMessage('As senhas nao conferem', 'error');
+    return;
+  }
+
+  if (newPassword && newPassword.length < 6) {
+    showProfileMessage('A senha deve ter pelo menos 6 caracteres', 'error');
+    return;
+  }
+
+  try {
+    const data = { whatsapp };
+
+    if (pin) {
+      data.pin = pin;
+    }
+
+    if (newPassword) {
+      data.password = newPassword;
+    }
+
+    const result = await window.api.updateProfile(data);
+
+    if (result.success) {
+      currentUser.whatsapp = whatsapp;
+      showProfileMessage('Perfil atualizado com sucesso!', 'success');
+
+      // Limpa campos de senha
+      document.getElementById('inputPin').value = '';
+      document.getElementById('inputNewPassword').value = '';
+      document.getElementById('inputConfirmPassword').value = '';
+    } else {
+      showProfileMessage(result.error || 'Erro ao salvar perfil', 'error');
+    }
+  } catch (error) {
+    console.error('Erro ao salvar perfil:', error);
+    showProfileMessage('Erro ao salvar perfil', 'error');
+  }
+}
+
+// Mostra mensagem no perfil
+function showProfileMessage(message, type) {
+  const messageEl = document.getElementById('profileMessage');
+  messageEl.textContent = message;
+  messageEl.className = `profile-message ${type}`;
+  messageEl.classList.remove('hidden');
+
+  setTimeout(() => {
+    messageEl.classList.add('hidden');
+  }, 5000);
 }
 
 // Configurar event listeners

@@ -8,30 +8,136 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app">
-    <!-- Header -->
-    <header class="header">
-      <h1 class="logo">FileHub</h1>
-      <div class="header-actions">
-        <div class="user-info" id="userInfo">
-          <div>
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <img src="logo-brand.png" alt="FileHub" class="sidebar-logo">
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-page="ferramentas">
+          <span class="nav-icon">&#128196;</span>
+          <span class="nav-text">Ferramentas</span>
+        </a>
+        <a href="#" class="nav-item" data-page="perfil">
+          <span class="nav-icon">&#128100;</span>
+          <span class="nav-text">Meu Perfil</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-card" id="userCard">
+          <div class="user-avatar" id="userAvatar">
+            <span>U</span>
+          </div>
+          <div class="user-details">
             <div class="user-name" id="userName">Usuario</div>
-            <div class="user-expiry" id="userExpiry">Expira em: --/--/----</div>
+            <div class="user-plan" id="userPlan">Plano</div>
           </div>
         </div>
-        <button class="btn btn-secondary" id="btnRefresh">Atualizar</button>
-        <button class="btn btn-danger btn-logout" id="btnLogout">Sair</button>
+        <button class="btn btn-danger btn-sm btn-logout" id="btnLogout">
+          <span>&#128682;</span> Sair
+        </button>
       </div>
-    </header>
+    </aside>
 
-    <!-- Status de conexao -->
-    <div class="connection-status" id="connectionStatus">
-      Conectando ao servidor...
-    </div>
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Header -->
+      <header class="main-header">
+        <div class="header-left">
+          <h1 class="page-title" id="pageTitle">Ferramentas</h1>
+        </div>
+        <div class="header-right">
+          <div class="user-expiry" id="userExpiry">Expira em: --/--/----</div>
+          <button class="btn btn-secondary btn-sm" id="btnRefresh">
+            <span>&#8635;</span> Atualizar
+          </button>
+        </div>
+      </header>
 
-    <!-- Grid de Cards -->
-    <main class="cards-grid" id="cardsGrid">
-      <!-- Cards serao inseridos aqui via JS -->
+      <!-- Status de conexao -->
+      <div class="connection-status" id="connectionStatus">
+        Conectando ao servidor...
+      </div>
+
+      <!-- Page: Ferramentas -->
+      <section class="page-content" id="pageFerramentas">
+        <div class="cards-grid" id="cardsGrid">
+          <!-- Cards serao inseridos aqui via JS -->
+        </div>
+      </section>
+
+      <!-- Page: Perfil -->
+      <section class="page-content hidden" id="pagePerfil">
+        <div class="profile-container">
+          <div class="profile-card">
+            <div class="profile-header">
+              <div class="profile-avatar-wrapper">
+                <div class="profile-avatar" id="profileAvatar">
+                  <span id="profileAvatarLetter">U</span>
+                  <img id="profileAvatarImg" src="" alt="" style="display: none;">
+                </div>
+                <button class="btn-avatar-edit" id="btnEditAvatar" title="Alterar avatar">
+                  &#9998;
+                </button>
+              </div>
+              <h2 id="profileName">Nome do Usuario</h2>
+              <p class="profile-email" id="profileEmail">email@exemplo.com</p>
+            </div>
+
+            <div class="profile-form">
+              <div class="form-section">
+                <h3>Informacoes Pessoais</h3>
+
+                <div class="form-group">
+                  <label>E-mail</label>
+                  <input type="email" id="inputEmail" disabled>
+                  <small>O e-mail nao pode ser alterado</small>
+                </div>
+
+                <div class="form-group">
+                  <label>WhatsApp</label>
+                  <input type="tel" id="inputWhatsapp" placeholder="(00) 00000-0000">
+                </div>
+              </div>
+
+              <div class="form-section">
+                <h3>Seguranca</h3>
+
+                <div class="form-group">
+                  <label>PIN de Seguranca (4 digitos)</label>
+                  <input type="password" id="inputPin" maxlength="4" placeholder="****">
+                </div>
+
+                <div class="form-group">
+                  <label>Nova Senha</label>
+                  <input type="password" id="inputNewPassword" placeholder="Deixe em branco para manter">
+                </div>
+
+                <div class="form-group">
+                  <label>Confirmar Nova Senha</label>
+                  <input type="password" id="inputConfirmPassword" placeholder="Confirme a nova senha">
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button class="btn btn-primary" id="btnSaveProfile">Salvar Alteracoes</button>
+              </div>
+
+              <div class="profile-message hidden" id="profileMessage"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="app-footer">
+        <p class="footer-copyright">© 2025 FileHub Plus | Todos os direitos reservados</p>
+        <p class="footer-description">Criado com &#128154; por apaixonados por tecnologia, design e inovacao,<br>oferecendo recursos graficos incriveis para inspirar criatividade e transformar ideias em projetos.</p>
+        <p class="footer-developer">Desenvolvido por: Creative Next - CNPJ 52.875.660/0001-10</p>
+      </footer>
     </main>
 
     <!-- Modal Descricao -->
@@ -47,18 +153,34 @@
       </div>
     </div>
 
+    <!-- Modal Avatar -->
+    <div class="modal" id="avatarModal">
+      <div class="modal-content modal-small">
+        <div class="modal-header">
+          <h2>Alterar Avatar</h2>
+          <button class="modal-close" id="closeAvatarModal">&times;</button>
+        </div>
+        <div class="avatar-upload-content">
+          <p>Cole a URL da imagem do seu avatar:</p>
+          <div class="form-group">
+            <input type="url" id="inputAvatarUrl" placeholder="https://exemplo.com/imagem.jpg">
+          </div>
+          <div class="avatar-preview" id="avatarPreview">
+            <span>Preview</span>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-secondary" id="btnCancelAvatar">Cancelar</button>
+            <button class="btn btn-primary" id="btnSaveAvatar">Salvar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Loading overlay -->
     <div class="loading-overlay" id="loadingOverlay">
       <div class="loading-spinner"></div>
       <p>Abrindo ferramenta...</p>
     </div>
-
-    <!-- Footer -->
-    <footer class="app-footer">
-      <p class="footer-copyright">© 2025 FileHub Plus | Todos os direitos reservados</p>
-      <p class="footer-description">Criado com 💚 por apaixonados por tecnologia, design e inovação,<br>oferecendo recursos gráficos incríveis para inspirar criatividade e transformar ideias em projetos.</p>
-      <p class="footer-developer">Desenvolvido por: Creative Next - CNPJ 52.875.660/0001-10</p>
-    </footer>
   </div>
 
   <script src="renderer.js"></script>

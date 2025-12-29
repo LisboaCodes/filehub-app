@@ -36,5 +36,8 @@ contextBridge.exposeInMainWorld('api', {
   // Ferramentas do MySQL
   getFerramentas: () => ipcRenderer.invoke('ferramentas:getAll'),
   getFerramentaById: (id) => ipcRenderer.invoke('ferramentas:getById', id),
-  openFerramenta: (ferramenta) => ipcRenderer.invoke('ferramentas:open', ferramenta)
+  openFerramenta: (ferramenta) => ipcRenderer.invoke('ferramentas:open', ferramenta),
+
+  // Perfil do usuario
+  updateProfile: (data) => ipcRenderer.invoke('profile:update', data)
 });

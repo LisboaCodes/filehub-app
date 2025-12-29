@@ -539,6 +539,60 @@ ipcMain.handle('ferramentas:open', async (event, ferramenta) => {
   }
 });
 
+// === PERFIL DO USUARIO ===
+ipcMain.handle('profile:update', async (event, data) => {
+  try {
+    if (!currentUser) {
+      return { success: false, error: 'Usuario nao autenticado' };
+    }
+
+    const updates = [];
+    const values = [];
+
+    if (data.avatar !== undefined) {
+      updates.push('avatar = ?');
+      values.push(data.avatar);
+    }
+
+    if (data.whatsapp !== undefined) {
+      updates.push('whatsapp = ?');
+      values.push(data.whatsapp);
+    }
+
+    if (data.pin !== undefined) {
+      updates.push('pin = ?');
+      values.push(data.pin);
+    }
+
+    if (data.password) {
+      const hashedPassword = await bcrypt.hash(data.password, 10);
+      updates.push('password = ?');
+      values.push(hashedPassword);
+    }
+
+    if (updates.length === 0) {
+      return { success: true };
+    }
+
+    values.push(currentUser.id);
+
+    await mysqlPool.execute(
+      `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+      values
+    );
+
+    // Atualiza o usuario local
+    if (data.avatar !== undefined) currentUser.avatar = data.avatar;
+    if (data.whatsapp !== undefined) currentUser.whatsapp = data.whatsapp;
+
+    console.log('Perfil atualizado com sucesso');
+    return { success: true };
+  } catch (error) {
+    console.error('Erro ao atualizar perfil:', error);
+    return { success: false, error: 'Erro ao atualizar perfil' };
+  }
+});
+
 // =============================================
 // AUTO-UPDATER
 // =============================================
