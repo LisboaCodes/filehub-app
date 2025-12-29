@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm start)",
+      "Bash(dir \"%APPDATA%\\\\filehub*\" /s)",
+      "Bash(dir \"%APPDATA%\\\\Electron*\" /s)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(npx electron:*)",
+      "Bash(npm run build:win:*)",
+      "Bash(dir \"C:\\\\Users\\\\lisbo\\\\OneDrive\\\\Área de Trabalho\\\\FILEHUB\\\\dist\\\\*.exe\")",
+      "Bash(ls -la \"C:\\\\Users\\\\lisbo\\\\OneDrive\\\\Área de Trabalho\\\\FILEHUB\\\\dist\"\" 2>/dev/null || dir \"C:UserslisboOneDriveÁrea de TrabalhoFILEHUBdist\"\")"
+    ]
+  }
+}

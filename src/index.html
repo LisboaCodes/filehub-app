@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:;">
+  <title>FileHub - Gerenciador de Ferramentas</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="logo">FileHub</h1>
+      <div class="header-actions">
+        <div class="user-info" id="userInfo">
+          <div>
+            <div class="user-name" id="userName">Usuario</div>
+            <div class="user-expiry" id="userExpiry">Expira em: --/--/----</div>
+          </div>
+        </div>
+        <button class="btn btn-secondary" id="btnRefresh">Atualizar</button>
+        <button class="btn btn-danger btn-logout" id="btnLogout">Sair</button>
+      </div>
+    </header>
+
+    <!-- Status de conexao -->
+    <div class="connection-status" id="connectionStatus">
+      Conectando ao servidor...
+    </div>
+
+    <!-- Grid de Cards -->
+    <main class="cards-grid" id="cardsGrid">
+      <!-- Cards serao inseridos aqui via JS -->
+    </main>
+
+    <!-- Modal Descricao -->
+    <div class="modal" id="descriptionModal">
+      <div class="modal-content modal-small">
+        <div class="modal-header">
+          <h2 id="descriptionTitle">Descricao</h2>
+          <button class="modal-close" id="closeDescriptionModal">&times;</button>
+        </div>
+        <div class="description-content" id="descriptionContent">
+          <!-- Descricao sera inserida aqui -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-spinner"></div>
+      <p>Abrindo ferramenta...</p>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

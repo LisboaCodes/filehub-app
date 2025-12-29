@@ -1,0 +1,38 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+out/
+
+# Cache
+.cache/
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# Ambiente
+.env
+.env.local
+*.local
+
+# Electron
+release/
+
+# Temporários
+*.tmp
+*.temp
+
+# Windows reserved names
+nul
+NUL

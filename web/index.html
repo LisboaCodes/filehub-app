@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="description" content="FileHub - Gerenciador de Ferramentas e Sessoes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FileHub">
+
+  <title>FileHub</title>
+
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Tela de Login -->
+  <div id="loginScreen" class="screen active">
+    <div class="login-container">
+      <div class="login-box">
+        <div class="login-header">
+          <h1 class="logo">FileHub</h1>
+          <p class="login-subtitle">Acesse sua conta</p>
+        </div>
+
+        <form id="loginForm" class="login-form">
+          <div class="form-group">
+            <label for="email">E-mail</label>
+            <input type="email" id="email" name="email" placeholder="seu@email.com" required autofocus>
+          </div>
+
+          <div class="form-group">
+            <label for="password">Senha</label>
+            <input type="password" id="password" name="password" placeholder="Sua senha" required>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="remember" name="remember">
+              <span>Lembrar de mim</span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-login" id="btnLogin">
+            <span class="btn-text">Entrar</span>
+            <span class="btn-loading" style="display: none;">Entrando...</span>
+          </button>
+
+          <div class="login-error" id="loginError" style="display: none;">
+            <span id="errorMessage"></span>
+          </div>
+        </form>
+
+        <div class="login-footer">
+          <p>FileHub - Acesse de qualquer lugar</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tela Principal -->
+  <div id="mainScreen" class="screen">
+    <div class="app">
+      <!-- Header -->
+      <header class="header">
+        <h1 class="logo">FileHub</h1>
+        <div class="header-actions">
+          <div class="user-info" id="userInfo">
+            <div>
+              <div class="user-name" id="userName">Usuario</div>
+              <div class="user-expiry" id="userExpiry">Expira em: --/--/----</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-small" id="btnRefresh">Atualizar</button>
+          <button class="btn btn-danger btn-small btn-logout" id="btnLogout">Sair</button>
+        </div>
+      </header>
+
+      <!-- Status de conexao -->
+      <div class="connection-status" id="connectionStatus">
+        Conectando ao servidor...
+      </div>
+
+      <!-- Barra de busca -->
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Buscar ferramenta..." class="search-input">
+      </div>
+
+      <!-- Grid de Cards -->
+      <main class="cards-grid" id="cardsGrid">
+        <!-- Cards serao inseridos aqui via JS -->
+      </main>
+
+      <!-- Modal Descricao -->
+      <div class="modal" id="descriptionModal">
+        <div class="modal-content modal-small">
+          <div class="modal-header">
+            <h2 id="descriptionTitle">Descricao</h2>
+            <button class="modal-close" id="closeDescriptionModal">&times;</button>
+          </div>
+          <div class="description-content" id="descriptionContent">
+            <!-- Descricao sera inserida aqui -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading overlay -->
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p>Carregando...</p>
+      </div>
+
+      <!-- Install PWA Banner -->
+      <div class="install-banner" id="installBanner" style="display: none;">
+        <p>Instale o FileHub no seu dispositivo!</p>
+        <button class="btn btn-primary btn-small" id="btnInstall">Instalar</button>
+        <button class="btn btn-secondary btn-small" id="btnDismissInstall">&times;</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

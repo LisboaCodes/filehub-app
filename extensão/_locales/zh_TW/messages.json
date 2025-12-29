@@ -1,0 +1,123 @@
+{
+  "appName": {
+    "message": "Filehub",
+    "description": "Nome da extensão"
+  },
+  "appDescription": {
+    "message": "Compartilhe o estado de login da sua conta com amigos sem precisar compartilhar sua senha, evitando que um desconecte o outro. Recomenda-se usar no mesmo IP para evitar bloqueios.",
+    "description": "Descrição da extensão"
+  },
+  "copySession": {
+    "message": "Copiar informações de login",
+    "description": "Texto do botão para copiar sessão"
+  },
+  "pasteSession": {
+    "message": "Colar informações de login",
+    "description": "Texto do botão para colar sessão"
+  },
+  "copySuccess": {
+    "message": "Cópia realizada com sucesso, agora você pode compartilhar com seus amigos!",
+    "description": "Mensagem exibida quando a cópia é bem-sucedida"
+  },
+  "introduction": {
+    "message": "O compartilhamento de estado de login pode ser usado para compartilhar contas em sites de vídeo como iQiyi, Youku, ou contas de aprendizado como New Oriental, Udacity, entre outros.",
+    "description": "Texto de introdução"
+  },
+  "noticeTitle": {
+    "message": "Aviso",
+    "description": "Título da seção de avisos"
+  },
+  "notice1": {
+    "message": "1. Compartilhe apenas com amigos de confiança, pois essa ação permite que eles operem sua conta durante o período de login, sendo uma operação de alto risco;",
+    "description": "Primeiro aviso"
+  },
+  "notice2": {
+    "message": "2. Nunca compartilhe informações de contas sensíveis, como Alipay, para evitar vazamentos;",
+    "description": "Segundo aviso"
+  },
+  "notice3": {
+    "message": "3. Se possível, compartilhe contas usando o mesmo IP para evitar ser identificado e bloqueado.",
+    "description": "Terceiro aviso"
+  },
+  "logoutNotice": {
+    "message": "Se você deseja desconectar todos os usuários compartilhados, saia manualmente da sua conta e faça login novamente.",
+    "description": "Aviso sobre desconexão"
+  },
+  "menuCopySession": {
+    "message": "Copiar informações de login",
+    "description": "Item do menu de contexto para copiar sessão"
+  },
+  "menuPasteSession": {
+    "message": "Colar informações de login",
+    "description": "Item do menu de contexto para colar sessão"
+  },
+  "clipboardEmpty": {
+    "message": "O conteúdo da área de transferência está vazio, a operação de colar falhou",
+    "description": "Mensagem de erro para área de transferência vazia"
+  },
+  "formatError": {
+    "message": "[Formato inválido] Não há informações de login válidas na área de transferência!",
+    "description": "Mensagem de erro para formato inválido"
+  },
+  "copyError": {
+    "message": "Erro ao copiar para a área de transferência: ",
+    "description": "Prefixo da mensagem de erro ao copiar para a área de transferência"
+  },
+  "pasteError": {
+    "message": "Erro ao processar a operação de colar: ",
+    "description": "Prefixo da mensagem de erro para operação de colar"
+  },
+  "tabError": {
+    "message": "Não foi possível obter a aba atual, a operação falhou",
+    "description": "Mensagem de erro quando a aba atual não pode ser obtida"
+  },
+  "highRisk": {
+    "message": "Operação de alto risco",
+    "description": "Texto de aviso de alto risco"
+  },
+  "trusted": {
+    "message": "Amigos de confiança",
+    "description": "Texto para amigos confiáveis"
+  },
+  "sensitive": {
+    "message": "Alipay e similares",
+    "description": "Texto para contas sensíveis"
+  },
+  "feedbackButton": {
+    "message": "Enviar feedback",
+    "description": "Texto do botão de feedback"
+  },
+  "errorTitle": {
+    "message": "Erro no Filehub",
+    "description": "Título para notificações de erro"
+  },
+  "generalNoticeTitle": {
+    "message": "Filehub",
+    "description": "Título para notificações gerais"
+  },
+  "chromePageError": {
+    "message": "Não é possível operar em páginas internas do Chrome",
+    "description": "Mensagem de erro ao tentar operar em páginas chrome://"
+  },
+  "invalidDataFormat": {
+    "message": "Formato de dados inválido, faltam campos obrigatórios",
+    "description": "Mensagem de erro para formato de dados inválido"
+  },
+  "pasteSessionError": {
+    "message": "Erro ao processar a sessão: ",
+    "description": "Prefixo da mensagem de erro ao colar a sessão"
+  },
+  "pasteSessionHere": {
+    "message": "Colar sessão aqui",
+    "description": "Texto padrão de sugestão na barra de endereço"
+  },
+  "pasteSessionForUrl": {
+    "message": "Colar sessão <url>$URL$</url>",
+    "description": "Texto de sugestão na barra de endereço com URL",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  }
+}

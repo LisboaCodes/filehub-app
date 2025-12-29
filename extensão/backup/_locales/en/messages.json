@@ -1,0 +1,123 @@
+{
+  "appName": {
+    "message": "Filehub - SessionBR",
+    "description": "O nome da extensão"
+  },
+  "appDescription": {
+    "message": "Acesse nossa comunidade - filehub.com.br",
+    "description": "A descrição da extensão"
+  },
+  "copySession": {
+    "message": "🔑 Gerar Chave de Acesso",
+    "description": "Texto do botão para copiar sessão"
+  },
+  "pasteSession": {
+    "message": "🔐 Acessar Plataforma",
+    "description": "Texto do botão para colar sessão"
+  },
+  "copySuccess": {
+    "message": "✅ Chave gerada com sucesso!",
+    "description": "Mensagem exibida quando a chave é copiada com sucesso"
+  },
+  "introduction": {
+    "message": "O Filehub permite gerar e compartilhar chaves de acesso com seus amigos de forma segura.",
+    "description": "Texto de introdução"
+  },
+  "noticeTitle": {
+    "message": "Aviso",
+    "description": "Título para a seção de avisos"
+  },
+  "notice1": {
+    "message": "1. Compartilhe apenas com amigos confiáveis, pois essa operação permite que eles acessem sua conta durante o período de validade da chave, o que é uma operação de alto risco;",
+    "description": "Primeiro item de aviso"
+  },
+  "notice2": {
+    "message": "2. Não compartilhe chaves de contas sensíveis, como Alipay, para evitar vazamento de informações;",
+    "description": "Segundo item de aviso"
+  },
+  "notice3": {
+    "message": "3. Se possível, use o mesmo IP ao compartilhar chaves para evitar bloqueios de conta.",
+    "description": "Terceiro item de aviso"
+  },
+  "logoutNotice": {
+    "message": "Para desconectar todos os usuários que usaram sua chave, saia manualmente da conta e faça login novamente.",
+    "description": "Aviso sobre desconexão"
+  },
+  "menuCopySession": {
+    "message": "Gerar Chave de Acesso",
+    "description": "Item do menu de contexto para copiar sessão"
+  },
+  "menuPasteSession": {
+    "message": "Acessar com Chave em Nova Aba",
+    "description": "Item do menu de contexto para colar sessão"
+  },
+  "clipboardEmpty": {
+    "message": "A área de transferência está vazia, a operação de acesso falhou",
+    "description": "Mensagem de erro para área de transferência vazia"
+  },
+  "formatError": {
+    "message": "[Erro de Formato] A chave na área de transferência não é válida!",
+    "description": "Mensagem de erro para formato inválido"
+  },
+  "copyError": {
+    "message": "Erro ao copiar a chave para a área de transferência: ",
+    "description": "Prefixo da mensagem de erro para falha ao copiar"
+  },
+  "pasteError": {
+    "message": "Erro ao processar a chave: ",
+    "description": "Prefixo da mensagem de erro para falha ao colar"
+  },
+  "tabError": {
+    "message": "Não foi possível obter a aba atual, a operação falhou",
+    "description": "Mensagem de erro quando não é possível obter a aba atual"
+  },
+  "highRisk": {
+    "message": "operação de alto risco",
+    "description": "Texto para aviso de alto risco"
+  },
+  "trusted": {
+    "message": "amigos confiáveis",
+    "description": "Texto para amigos confiáveis"
+  },
+  "sensitive": {
+    "message": "Alipay e similares",
+    "description": "Texto para contas sensíveis"
+  },
+  "feedbackButton": {
+    "message": "Enviar Feedback",
+    "description": "Texto para o botão de feedback"
+  },
+  "errorTitle": {
+    "message": "Erro no Filehub",
+    "description": "Título para notificações de erro"
+  },
+  "generalNoticeTitle": {
+    "message": "Filehub",
+    "description": "Título para notificações gerais"
+  },
+  "chromePageError": {
+    "message": "Não é possível operar em páginas internas do Chrome",
+    "description": "Mensagem de erro ao tentar operar em páginas chrome://"
+  },
+  "invalidDataFormat": {
+    "message": "Formato da chave inválido, faltam dados obrigatórios",
+    "description": "Mensagem de erro para formato de dados inválido"
+  },
+  "pasteSessionError": {
+    "message": "Erro ao processar a chave: ",
+    "description": "Prefixo da mensagem de erro quando o acesso com a chave falha"
+  },
+  "pasteSessionHere": {
+    "message": "Colar Chave Aqui",
+    "description": "Texto de sugestão padrão para a omnibox"
+  },
+  "pasteSessionForUrl": {
+    "message": "Acessar com Chave <url>$URL$</url>",
+    "description": "Texto de sugestão para a omnibox com URL",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  }
+}

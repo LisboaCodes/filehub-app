@@ -1,0 +1,48 @@
+{
+    "update_url": "http://clients2.google.com/service/update2/crx",
+    "name": "__MSG_appName__",
+    "version": "2.1",
+    "manifest_version": 3,
+    "description": "__MSG_appDescription__",
+    "default_locale": "en",
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_icon": "filehub128.png",
+        "default_popup": "popup.html"
+    },
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["lib/jquery-v3.3.1.min.js", "content-script.js"]
+        }
+    ],
+    "omnibox": {
+        "keyword": "filehub" 
+    },
+    "icons": {
+        "48": "filehub48.png",
+        "128": "filehub128.png"
+    },
+    "minimum_chrome_version": "88",
+    "permissions": [
+        "contextMenus",
+        "cookies",
+        "clipboardWrite",
+        "clipboardRead",
+        "activeTab",
+        "scripting",
+        "notifications",
+        "tabs"
+    ],
+    "host_permissions": [
+        "*://*/*"
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": ["filehub48.png", "filehub128.png"],
+            "matches": ["<all_urls>"]
+        }
+    ]
+}

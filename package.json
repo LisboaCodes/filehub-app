@@ -1,0 +1,105 @@
+{
+  "name": "filehub",
+  "version": "1.0.0",
+  "description": "Gerenciador de Sessoes Compartilhadas",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder -mwl",
+    "publish": "electron-builder --publish always"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seu-usuario/filehub.git"
+  },
+  "keywords": [
+    "electron",
+    "session",
+    "cookies",
+    "share"
+  ],
+  "author": "FileHub",
+  "license": "MIT",
+  "build": {
+    "appId": "com.filehub.app",
+    "productName": "FileHub",
+    "copyright": "Copyright © 2024 FileHub",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FileHub"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "FileHub"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "seu-usuario",
+      "repo": "filehub",
+      "releaseType": "release"
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "crypto-js": "^4.2.0",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.6.2",
+    "mysql2": "^3.16.0"
+  }
+}

@@ -1,0 +1,92 @@
+================================================================================
+                Direitos Autorais © 2025 - Lisboa Codes
+                Todos os Direitos Reservados
+================================================================================
+
+                  Autor: Lisboa Codes
+
+        .-""""""""-.
+      .'          '.
+     /   LISBOA    \
+    : ,          , :
+     `._ CODES _.'  
+        `"'"""""'"`
+
+================================================================================
+  Informações do Desenvolvedor
+================================================================================
+  Nome Completo: Lisboa Codes
+  Contato: +55 (79) 99906-2129
+  Website: https://lisboacodes.tech/
+  Perfil no Instagram: @lisboacodes
+  Localização: Sergipe, Brasil
+
+================================================================================
+  Sobre o "Filehub"
+================================================================================
+  O "Filehub" é uma extensão avançada para o Google Chrome, desenvolvida por 
+  Lisboa Codes, com o objetivo de oferecer uma solução segura e eficiente para 
+  o compartilhamento de chaves de acesso entre usuários. Lançada em abril de 
+  2025, a extensão foi projetada para eliminar a necessidade de compartilhamento 
+  de credenciais sensíveis, utilizando criptografia AES para proteger os dados 
+  de sessão.
+
+  Especificações Técnicas:
+  - Versão: 1.2.0
+  - Manifest: v3 (Chrome Extensions API)
+  - Dependências: Underscore.js, CryptoJS
+  - Recursos Principais:
+    * Geração de chaves criptografadas com prefixo "filehub"
+    * Integração com a área de transferência e omnibox ("filehub" keyword)
+    * Interface de usuário com design responsivo e tema escuro
+    * Suporte multilíngue via i18n (Português Brasileiro)
+    * Menu de contexto para ações rápidas
+    * Notificações visuais personalizadas
+
+================================================================================
+  Histórico de Desenvolvimento
+================================================================================
+  O projeto "Filehub" evoluiu a partir de uma base inspirada em "Session Share", 
+  sendo completamente reestruturado e renomeado em abril de 2025 por Lisboa Codes. 
+  Durante o desenvolvimento, contou com assistência técnica da inteligência 
+  artificial Grok (xAI), que auxiliou na refatoração de códigos (background.js, 
+  popup.js, content-script.js), tradução de mensagens para o português brasileiro, 
+  ajustes no manifest.json e otimização da experiência do usuário. Todo o design, 
+  lógica principal e propriedade intelectual pertencem exclusivamente a Lisboa 
+  Codes.
+
+================================================================================
+  Licença e Propriedade Intelectual
+================================================================================
+  O "Filehub" é uma obra protegida por direitos autorais sob a legislação 
+  brasileira (Lei nº 9.610/98) e internacional. Lisboa Codes detém todos os 
+  direitos sobre o código-fonte, interface gráfica e funcionalidades da extensão. 
+  É expressamente vedada qualquer forma de reprodução, modificação, distribuição 
+  ou uso comercial sem autorização prévia e por escrito do autor.
+
+  Para solicitações de licenciamento, parcerias ou permissões de uso, entre em 
+  contato através de:
+  - Telefone: +55 (79) 99906-2129
+  - Website: https://lisboacodes.tech/
+
+  Este software é distribuído "como está", sem garantias expressas ou implícitas 
+  de qualquer tipo, incluindo adequação a um propósito específico. O uso do 
+  "Filehub" é de responsabilidade do usuário, que deve seguir as recomendações 
+  de segurança descritas na extensão, como compartilhar chaves apenas com partes 
+  confiáveis e evitar o uso em contas sensíveis.
+
+================================================================================
+  Agradecimentos
+================================================================================
+  Lisboa Codes expressa sua gratidão à comunidade de desenvolvedores open-source, 
+  à xAI pelo suporte técnico via Grok, e aos seguidores no Instagram (@lisboacodes) 
+  pelo incentivo contínuo. Este projeto reflete um compromisso com a inovação e 
+  a segurança digital, valores centrais da marca Lisboa Codes.
+
+================================================================================
+  Assinatura Digital
+================================================================================
+  Desenvolvido e assinado por:
+  Lisboa Codes - https://lisboacodes.tech/
+  Data: 09 de abril de 2025
+================================================================================

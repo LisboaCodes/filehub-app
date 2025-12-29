@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filehub</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+      /* ======== BLOCO DE FONTE ======== */
+      @font-face {
+          font-family: 'Syne-SemiBold';
+          src: url('https://app.filehub.com.br/fonts/Syne-SemiBold.woff2') format('woff2');
+          font-weight: normal;
+          font-style: normal;
+      }
+      /* ======== FIM DO BLOCO DE FONTE ======== */
+      
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'Syne-SemiBold', sans-serif;
+        background-color: #020802;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes logoSpin {
+        0% { transform: scale(0) rotate(0deg); opacity: 0; }
+        50% { transform: scale(1.2) rotate(180deg); opacity: 1; }
+        100% { transform: scale(1) rotate(360deg); opacity: 1; }
+      }
+      .container {
+        width: 340px;
+        max-width: 100%;
+        padding: 20px;
+        background: linear-gradient(135deg, #0a0d0a, #0a0d0a, #1b7f68);
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+        margin: 20px;
+        animation: fadeInUp 0.6s ease-out;
+      }
+      .logo-container {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .logo-container img {
+        max-width: 120px;
+        height: auto;
+        transition: transform 0.3s ease;
+        animation: logoSpin 1s ease-out forwards; /* Animação ao carregar */
+      }
+      .logo-container img:hover {
+        transform: scale(1.1);
+      }
+      .menu-list {
+        margin-bottom: 20px;
+      }
+      .menu-list .menu-item {
+        position: relative;
+        overflow: hidden;
+        padding: 15px;
+        text-align: center;
+        border-radius: 10px;
+        margin-bottom: 15px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.1);
+        transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
+        font-weight: 600;
+        color: #fff;
+        border: none;
+      }
+      .menu-list .menu-item:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      }
+      .menu-list .menu-item::after {
+        content: "";
+        position: absolute;
+        background: rgba(255, 255, 255, 0.3);
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        opacity: 0;
+        transition: opacity 0.3s, transform 0.3s;
+        transform: scale(0);
+      }
+      .menu-list .menu-item:active::after {
+        opacity: 1;
+        transform: scale(1);
+        transition: transform 0s;
+      }
+      .menu-item:first-child {
+        background: linear-gradient(45deg, #0a0d0a, #0a0d0a);
+      }
+      .menu-item:first-child:hover {
+        background: linear-gradient(45deg, #4ec2a7, #0a0d0a);
+      }
+      .hidden {
+        display: none !important;
+      }
+      #copy_success {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      #copy_success .text {
+        font-size: 18px;
+        color: #fff;
+        text-align: center;
+        padding: 25px 30px;
+        border-radius: 10px;
+        background-color: rgba(0, 0, 0, 0.6);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      }
+      hr {
+        margin: 15px 0;
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      /* Estilo do Modal Sobre */
+      .about-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1100;
+      }
+      .about-modal.active {
+        display: flex;
+      }
+      .about-modal-content {
+        background: linear-gradient(135deg, #0a0d0a, #1b7f68);
+        padding: 20px;
+        border-radius: 15px;
+        max-width: 300px;
+        width: 90%;
+        color: #ffffff;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+        position: relative;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+      .about-modal-content h2 {
+        font-size: 20px;
+        margin-bottom: 15px;
+        color: #4ec2a7;
+        text-align: center;
+      }
+      .about-modal-content p {
+        font-size: 12px;
+        margin-bottom: 10px;
+        line-height: 1.4;
+      }
+      .about-modal-content a {
+        color: #4ec2a7;
+        text-decoration: none;
+      }
+      .about-modal-content a:hover {
+        text-decoration: underline;
+      }
+      .about-modal-content .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #ffffff;
+        cursor: pointer;
+      }
+      .about-modal-content pre {
+        font-size: 10px;
+        white-space: pre-wrap;
+        margin: 10px 0;
+        text-align: center;
+      }
+
+      /* Estilo do Link Sobre */
+      .about-link {
+        text-align: center;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.7);
+        cursor: pointer;
+        transition: color 0.3s ease;
+      }
+      .about-link:hover {
+        color: #4ec2a7;
+      }
+      .about-link a {
+        color: inherit;
+        text-decoration: none;
+      }
+      .about-link a:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <textarea id="clipboard" class="hidden"></textarea>
+    <div class="container">
+      <div class="title">
+        <center><img width="120" class="icon" src="./logo.png"/>
+        <div class="title-text">Filehub</div></center>
+      </div>
+      <hr>
+      <div class="menu-list">
+        <div class="menu-item" id="id_filehub_copy" data-i18n="copySession"></div>
+        <div class="menu-item" id="id_filehub_paste" data-i18n="pasteSession"></div>
+      </div>
+      <div class="about-link" id="about_btn">Sobre | <a href="https://filehub.com.br/" target="_blank">Filehub 2025</a></div>
+      <div id="copy_success" class="copy_success hidden">
+        <div class="text" data-i18n="copySuccess"></div>
+      </div>
+    </div>
+
+    <!-- Modal Sobre -->
+    <div class="about-modal" id="about_modal">
+      <div class="about-modal-content">
+        <button class="close-btn" id="close_about">×</button>
+        <h2>Filehub - Sobre</h2>
+        <pre>
+        .-""""""""-.
+      .'          '.
+     /   LISBOA    \
+    : ,          , :
+     `._ CODES _.'  
+        `"'"""""'"`  
+        </pre>
+        <p><strong>Autor:</strong> Lisboa Codes</p>
+        <p><strong>Versão:</strong> 1.2.0</p>
+        <p><strong>Descrição:</strong> O "Filehub" é uma extensão para Chrome que permite compartilhar chaves de acesso criptografadas de forma segura, sem revelar senhas.</p>
+        <p><strong>Contato:</strong> +55 (79) 99906-2129</p>
+        <p><strong>Website:</strong> <a href="https://lisboacodes.tech/" target="_blank">lisboacodes.tech</a></p>
+        <p><strong>Instagram:</strong> <a href="https://instagram.com/lisboacodes" target="_blank">@lisboacodes</a></p>
+        <p><strong>Direitos Autorais:</strong> © 2025 Lisboa Codes. Todos os direitos reservados. Proibida a reprodução ou uso sem permissão expressa.</p>
+        <p><strong>Desenvolvimento:</strong> Criado por Lisboa Codes com assistência técnica de Grok (xAI) em abril de 2025.</p>
+      </div>
+    </div>
+
+    <script src="lib/jquery-v3.3.1.min.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
