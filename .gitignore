@@ -36,3 +36,4 @@ release/
 # Windows reserved names
 nul
 NUL
+.claude/settings.local.json
