@@ -116,7 +116,67 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Carrega o Dashboard como pagina inicial
   loadDashboard();
+
+  // Escuta evento de sessao invalidada (login em outro dispositivo)
+  window.api.onSessionInvalidated(() => {
+    showSessionInvalidatedAlert();
+  });
 });
+
+// Mostra alerta de sessao invalidada e faz logout
+function showSessionInvalidatedAlert() {
+  // Cria overlay de alerta
+  const overlay = document.createElement('div');
+  overlay.id = 'sessionInvalidatedOverlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+  `;
+
+  overlay.innerHTML = `
+    <div style="
+      background: #1a1a1a;
+      border-radius: 16px;
+      padding: 40px;
+      text-align: center;
+      max-width: 400px;
+      border: 1px solid #333;
+    ">
+      <div style="font-size: 48px; margin-bottom: 20px;">&#9888;</div>
+      <h2 style="color: #fff; margin-bottom: 16px; font-size: 1.5rem;">Sessao Encerrada</h2>
+      <p style="color: #888; margin-bottom: 24px; line-height: 1.5;">
+        Sua conta foi acessada em outro dispositivo.<br>
+        Apenas uma sessao ativa e permitida por conta.
+      </p>
+      <button id="btnSessionLogout" style="
+        background: linear-gradient(135deg, #157f67, #1a9e7a);
+        color: white;
+        border: none;
+        padding: 12px 32px;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+      ">Entendi</button>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Ao clicar no botao, faz logout
+  document.getElementById('btnSessionLogout').addEventListener('click', async () => {
+    await window.api.logout();
+    window.location.reload();
+  });
+}
 
 // Configurar busca de ferramentas (IAs)
 function setupFerramentasSearch() {

@@ -64,6 +64,9 @@ contextBridge.exposeInMainWorld('api', {
   // Menu events
   onMenuRefresh: (callback) => ipcRenderer.on('menu:refresh', () => callback()),
 
+  // Session events
+  onSessionInvalidated: (callback) => ipcRenderer.on('session:invalidated', () => callback()),
+
   // =============================================
   // ADMIN - APENAS PARA ADMINISTRADORES
   // =============================================

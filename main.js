@@ -4,6 +4,7 @@ const CryptoJS = require('crypto-js');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 const { autoUpdater } = require('electron-updater');
+const crypto = require('crypto');
 const Database = require('./src/database');
 
 // Configuracao do auto-updater
@@ -12,6 +13,8 @@ autoUpdater.autoInstallOnAppQuit = true;
 
 // Usuario logado atualmente
 let currentUser = null;
+let currentSessionToken = null;
+let sessionCheckInterval = null;
 
 // Configuracao do banco de dados MySQL
 const mysqlConfig = {
@@ -507,11 +510,18 @@ async function loginUser(email, password) {
       };
     }
 
-    // Atualiza last_seen_at
+    // Gera token de sessao unico
+    const sessionToken = crypto.randomUUID();
+    currentSessionToken = sessionToken;
+
+    // Atualiza last_seen_at e session_token no banco
     await mysqlPool.execute(
-      'UPDATE users SET last_seen_at = NOW() WHERE id = ?',
-      [user.id]
+      'UPDATE users SET last_seen_at = NOW(), session_token = ?, session_updated_at = NOW() WHERE id = ?',
+      [sessionToken, user.id]
     );
+
+    // Inicia verificacao periodica da sessao (a cada 10 segundos)
+    startSessionCheck(user.id);
 
     // Adiciona nome do plano ao usuario
     user.plano_nome = PLANO_NAMES[user.plano_id] || 'Desconhecido';
@@ -522,6 +532,7 @@ async function loginUser(email, password) {
 
     console.log('Login bem sucedido:', user.name, '- Plano:', user.plano_nome, '- Nivel:', user.nivel_acesso);
     console.log('Avatar do usuario:', user.avatar);
+    console.log('Session token:', sessionToken);
     return {
       success: true,
       user: userWithoutPassword
@@ -541,8 +552,52 @@ function formatDate(dateStr) {
 
 // Faz logout
 function logoutUser() {
+  // Para a verificacao de sessao
+  if (sessionCheckInterval) {
+    clearInterval(sessionCheckInterval);
+    sessionCheckInterval = null;
+  }
   currentUser = null;
+  currentSessionToken = null;
   return { success: true };
+}
+
+// Inicia verificacao periodica da sessao
+function startSessionCheck(userId) {
+  // Para qualquer verificacao anterior
+  if (sessionCheckInterval) {
+    clearInterval(sessionCheckInterval);
+  }
+
+  // Verifica a cada 10 segundos
+  sessionCheckInterval = setInterval(async () => {
+    try {
+      if (!currentSessionToken || !userId) return;
+
+      const [rows] = await mysqlPool.execute(
+        'SELECT session_token FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (rows.length > 0) {
+        const dbToken = rows[0].session_token;
+
+        // Se o token do banco for diferente, outra sessao foi iniciada
+        if (dbToken && dbToken !== currentSessionToken) {
+          console.log('Sessao invalidada! Outro login detectado.');
+
+          // Notifica o renderer para mostrar alerta e deslogar
+          mainWindow?.webContents.send('session:invalidated');
+
+          // Para a verificacao
+          clearInterval(sessionCheckInterval);
+          sessionCheckInterval = null;
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao verificar sessao:', error.message);
+    }
+  }, 10000); // 10 segundos
 }
 
 // Funcao para descriptografar dados do FileHub/Session Share
