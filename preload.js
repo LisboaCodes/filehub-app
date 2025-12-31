@@ -171,6 +171,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Menu - Itens (usuario)
   getMenuItems: () => ipcRenderer.invoke('menu:getItems'),
+  getAllMenuItems: () => ipcRenderer.invoke('menu:getAllItems'),
 
   // Admin - Menu Items
   adminGetMenuItems: () => ipcRenderer.invoke('admin:getMenuItems'),

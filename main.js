@@ -2428,7 +2428,7 @@ ipcMain.handle('admin:deleteCover', async (event, id) => {
 // MENU - GERENCIAMENTO
 // =============================================
 
-// Buscar itens do menu ativos
+// Buscar itens do menu ativos (para exibicao)
 ipcMain.handle('menu:getItems', async () => {
   try {
     const [items] = await mysqlPool.execute(
@@ -2437,6 +2437,19 @@ ipcMain.handle('menu:getItems', async () => {
     return { success: true, data: items };
   } catch (error) {
     console.error('Erro ao buscar menu:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Buscar TODOS os itens do menu (para verificar paginas ativas/inativas)
+ipcMain.handle('menu:getAllItems', async () => {
+  try {
+    const [items] = await mysqlPool.execute(
+      'SELECT * FROM menu_items ORDER BY `order` ASC'
+    );
+    return { success: true, data: items };
+  } catch (error) {
+    console.error('Erro ao buscar todos os itens do menu:', error);
     return { success: false, error: error.message };
   }
 });
@@ -2514,11 +2527,70 @@ ipcMain.handle('admin:deleteMenuItem', async (event, id) => {
 });
 
 // =============================================
+// INICIALIZACAO DE MENU ITEMS PADRAO
+// =============================================
+
+async function initDefaultMenuItems() {
+  if (!mysqlPool) return;
+
+  try {
+    // Cria tabela se nao existir
+    await mysqlPool.execute(`
+      CREATE TABLE IF NOT EXISTS menu_items (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        label VARCHAR(100) NOT NULL,
+        icon VARCHAR(50),
+        page VARCHAR(50),
+        \`order\` INT DEFAULT 0,
+        is_active TINYINT DEFAULT 1,
+        parent_id INT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+
+    // Verifica se ja existem itens no menu
+    const [existing] = await mysqlPool.execute('SELECT COUNT(*) as count FROM menu_items');
+    if (existing[0].count > 0) {
+      console.log('Menu items ja existem:', existing[0].count);
+      return;
+    }
+
+    console.log('Inicializando menu_items padrao...');
+
+    // Itens padrao do menu (Dashboard desativado por padrao)
+    const defaultItems = [
+      { label: 'Dashboard', icon: '&#127968;', page: 'dashboard', order: 1, is_active: 0 },
+      { label: 'Inteligencia Artificial', icon: '&#129302;', page: 'ferramentas', order: 2, is_active: 1 },
+      { label: 'Acessos Premium', icon: '&#11088;', page: 'acessos', order: 5, is_active: 1 },
+      { label: 'Materiais', icon: '&#128218;', page: 'materiais', order: 6, is_active: 1 },
+      { label: 'Meu Perfil', icon: '&#128100;', page: 'perfil', order: 7, is_active: 1 },
+      { label: 'Planos', icon: '&#128179;', page: 'planos', order: 8, is_active: 1 },
+      { label: 'Arquivos Canva', icon: '&#128196;', page: 'canva-arquivos', order: 3, is_active: 1 },
+      { label: 'Acesso Canva', icon: '&#128279;', page: 'canva-acesso', order: 4, is_active: 1 },
+    ];
+
+    for (const item of defaultItems) {
+      await mysqlPool.execute(
+        'INSERT INTO menu_items (label, icon, page, `order`, is_active, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+        [item.label, item.icon, item.page, item.order, item.is_active]
+      );
+      console.log(`Menu item criado: ${item.label} (ativo: ${item.is_active})`);
+    }
+
+    console.log('Menu items inicializados com sucesso!');
+  } catch (error) {
+    console.error('Erro ao inicializar menu items:', error);
+  }
+}
+
+// =============================================
 // APP LIFECYCLE
 // =============================================
 
 app.whenReady().then(async () => {
   await initMySQL();
+  await initDefaultMenuItems(); // Inicializa menu items padrao
   initDatabase();
   createWindow();
   createMenu();

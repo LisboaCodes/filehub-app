@@ -10,6 +10,8 @@ let currentCanvaCategoria = 'all';
 let currentCanvaBusca = '';
 let currentUser = null;
 let currentPage = 'ferramentas';
+let menuItemsConfig = []; // Configuracao de paginas ativas/inativas
+let activePages = {}; // Mapa de paginas ativas { page: boolean }
 
 // Elementos DOM
 const cardsGrid = document.getElementById('cardsGrid');
@@ -84,6 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   replaceMenuIcons();
 
   await loadUserInfo();
+  await loadPageSettings(); // Carrega configuracao de paginas ativas
   await loadFerramentas();
   await loadAcessosPremium();
   await loadMateriais();
@@ -114,8 +117,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     initAdminReportsSetup();
   }
 
-  // Carrega o Dashboard como pagina inicial
-  loadDashboard();
+  // Navega para a pagina inicial (dashboard se ativo, senao perfil)
+  const initialPage = getInitialPage();
+  console.log('Pagina inicial:', initialPage);
+  navigateTo(initialPage);
 
   // Escuta evento de sessao invalidada (login em outro dispositivo)
   window.api.onSessionInvalidated(() => {
@@ -176,6 +181,96 @@ function showSessionInvalidatedAlert() {
     await window.api.logout();
     window.location.reload();
   });
+}
+
+// =============================================
+// SISTEMA DE PAGINAS ATIVAS/INATIVAS
+// =============================================
+
+// Carrega configuracao de paginas do banco de dados
+async function loadPageSettings() {
+  try {
+    // Busca TODOS os itens do menu (ativos e inativos)
+    const result = await window.api.getAllMenuItems();
+    if (result.success && result.data && result.data.length > 0) {
+      menuItemsConfig = result.data;
+
+      // Cria mapa de paginas ativas/inativas
+      activePages = {};
+      menuItemsConfig.forEach(item => {
+        if (item.page) {
+          activePages[item.page] = item.is_active === 1;
+        }
+      });
+
+      console.log('Configuracao de paginas carregada:', activePages);
+      applyPageVisibility();
+    } else {
+      console.log('Nenhuma configuracao de paginas encontrada, usando padrao');
+    }
+  } catch (error) {
+    console.error('Erro ao carregar configuracao de paginas:', error);
+  }
+}
+
+// Aplica visibilidade dos itens do menu baseado nas configuracoes
+function applyPageVisibility() {
+  console.log('Aplicando visibilidade do menu. Paginas ativas:', activePages);
+
+  // Itens principais do menu - busca todos os .nav-item com data-page
+  document.querySelectorAll('.sidebar-nav .nav-item[data-page]').forEach(item => {
+    const page = item.dataset.page;
+    // Verifica se a pagina esta explicitamente desativada (is_active === false)
+    if (page && activePages.hasOwnProperty(page) && activePages[page] === false) {
+      item.style.display = 'none';
+      console.log(`Menu oculto: ${page}`);
+    }
+  });
+
+  // Submenus dentro de menus expansiveis
+  document.querySelectorAll('.nav-submenu-item[data-page]').forEach(item => {
+    const page = item.dataset.page;
+    if (page && activePages.hasOwnProperty(page) && activePages[page] === false) {
+      item.style.display = 'none';
+      console.log(`Submenu oculto: ${page}`);
+    }
+  });
+
+  // Menus expansiveis (Canva) - esconder se todos os submenus estiverem inativos
+  const canvaMenu = document.getElementById('canvaMenu');
+  if (canvaMenu) {
+    const canvaArquivosActive = !activePages.hasOwnProperty('canva-arquivos') || activePages['canva-arquivos'] === true;
+    const canvaAcessoActive = !activePages.hasOwnProperty('canva-acesso') || activePages['canva-acesso'] === true;
+    if (!canvaArquivosActive && !canvaAcessoActive) {
+      canvaMenu.style.display = 'none';
+      console.log('Menu Canva oculto (todos submenus inativos)');
+    }
+  }
+}
+
+// Verifica se uma pagina esta ativa
+function isPageActive(page) {
+  // Paginas admin sempre ativas
+  if (page && page.startsWith('admin-')) {
+    return true;
+  }
+  // Se nao existe configuracao, assume que esta ativa (fallback)
+  if (activePages[page] === undefined) {
+    return true;
+  }
+  return activePages[page];
+}
+
+// Retorna a pagina inicial baseada nas configuracoes
+// Se dashboard ativo -> dashboard
+// Se dashboard inativo -> perfil
+function getInitialPage() {
+  // Se dashboard esta ativo, vai para dashboard
+  if (isPageActive('dashboard')) {
+    return 'dashboard';
+  }
+  // Se dashboard inativo, vai para perfil
+  return 'perfil';
 }
 
 // Configurar busca de ferramentas (IAs)
@@ -493,6 +588,12 @@ function setupNavigation() {
 
 // Navegar para uma pagina
 function navigateTo(page) {
+  // Verifica se a pagina esta ativa (exceto paginas admin)
+  if (!isPageActive(page)) {
+    console.log(`Pagina ${page} esta inativa, redirecionando para pagina inicial`);
+    page = getInitialPage();
+  }
+
   currentPage = page;
 
   // Atualiza navegacao ativa
