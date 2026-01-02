@@ -600,6 +600,87 @@ function startSessionCheck(userId) {
   }, 10000); // 10 segundos
 }
 
+// Funcao para parsear cookies no formato Netscape (cookies.txt)
+// Formato: dominio\tflag_subdominio\tpath\tsecure\texpiracao\tnome\tvalor
+function parseNetscapeCookies(data) {
+  const lines = data.split('\n');
+  const cookies = [];
+  let detectedDomain = null;
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+
+    // Ignora linhas vazias e comentarios
+    if (!trimmedLine || trimmedLine.startsWith('#')) {
+      continue;
+    }
+
+    // Separa por TAB
+    const parts = trimmedLine.split('\t');
+
+    // Formato Netscape tem 7 campos
+    if (parts.length >= 7) {
+      const [domain, includeSubdomains, path, secure, expiration, name, value] = parts;
+
+      // Captura o dominio principal para construir a URL
+      if (!detectedDomain) {
+        detectedDomain = domain.startsWith('.') ? domain.substring(1) : domain;
+      }
+
+      const cookie = {
+        name: name,
+        value: value,
+        domain: domain,
+        path: path || '/',
+        secure: secure.toUpperCase() === 'TRUE',
+        httpOnly: false // Netscape format nao tem essa info, assume false
+      };
+
+      // Adiciona expiracao se nao for 0 (sessao)
+      const exp = parseInt(expiration, 10);
+      if (exp && exp > 0) {
+        cookie.expirationDate = exp;
+      }
+
+      cookies.push(cookie);
+    }
+  }
+
+  return {
+    cookies,
+    detectedDomain
+  };
+}
+
+// Verifica se o texto esta no formato Netscape cookies.txt
+function isNetscapeFormat(data) {
+  // Verifica se contem o header tipico do Netscape ou linhas com formato de cookie
+  const lines = data.split('\n');
+
+  // Verifica header Netscape
+  if (data.includes('# Netscape HTTP Cookie File') || data.includes('# HTTP Cookie File')) {
+    return true;
+  }
+
+  // Verifica se tem linhas no formato correto (7 campos separados por TAB)
+  let validLines = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const parts = trimmed.split('\t');
+    if (parts.length >= 7) {
+      // Verifica se o 4o campo (secure) e TRUE ou FALSE
+      if (parts[3].toUpperCase() === 'TRUE' || parts[3].toUpperCase() === 'FALSE') {
+        validLines++;
+      }
+    }
+  }
+
+  // Se tem pelo menos 3 linhas validas, provavelmente e formato Netscape
+  return validLines >= 3;
+}
+
 // Funcao para descriptografar dados do FileHub/Session Share
 function decryptSessionShare(encryptedData, password = '') {
   try {
@@ -610,6 +691,21 @@ function decryptSessionShare(encryptedData, password = '') {
       data = data.substring(8).trim(); // "filehub " = 8 caracteres
     } else if (data.startsWith('session_paste ')) {
       data = data.substring(14).trim();
+    }
+
+    // Verifica se e formato Netscape (cookies.txt)
+    if (isNetscapeFormat(data)) {
+      console.log('Detectado formato Netscape cookies.txt');
+      const { cookies, detectedDomain } = parseNetscapeCookies(data);
+
+      if (cookies.length > 0) {
+        // Constroi URL a partir do dominio detectado
+        const url = detectedDomain ? `https://${detectedDomain}` : null;
+        console.log(`Parseados ${cookies.length} cookies do formato Netscape. Dominio: ${detectedDomain}`);
+        return { success: true, cookies, url };
+      }
+
+      return { success: false, error: 'Nenhum cookie valido encontrado no formato Netscape.' };
     }
 
     // Se ja for JSON valido, retorna direto
@@ -1060,7 +1156,56 @@ ipcMain.handle('ferramentas:open', async (event, ferramenta) => {
     console.log('Tipo acesso:', ferramenta.tipo_acesso);
     console.log('Link/Conteudo (primeiros 100 chars):', ferramenta.link_ou_conteudo?.substring(0, 100));
 
-    // Descriptografa os dados da sessao
+    const tipoAcesso = ferramenta.tipo_acesso || 'sessao';
+
+    // === TIPO: LINK - Abre URL diretamente no navegador ===
+    if (tipoAcesso === 'link') {
+      const url = ferramenta.link_ou_conteudo;
+      if (url) {
+        shell.openExternal(url);
+        return { success: true };
+      }
+      return { success: false, error: 'URL nao configurada' };
+    }
+
+    // === TIPO: COOKIES_TXT (Netscape) - Parser especifico ===
+    if (tipoAcesso === 'cookies_txt') {
+      console.log('Processando formato Cookies.txt (Netscape)...');
+
+      if (!ferramenta.link_ou_conteudo || !isNetscapeFormat(ferramenta.link_ou_conteudo)) {
+        const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+        return {
+          success: false,
+          error: 'Cookies.txt nao configurado ou formato invalido',
+          needsSetup: true,
+          isAdmin: isAdmin
+        };
+      }
+
+      const { cookies, detectedDomain } = parseNetscapeCookies(ferramenta.link_ou_conteudo);
+
+      if (cookies.length === 0) {
+        return { success: false, error: 'Nenhum cookie valido encontrado no arquivo cookies.txt' };
+      }
+
+      const url = detectedDomain ? `https://${detectedDomain}` : null;
+      if (!url) {
+        return { success: false, error: 'Nao foi possivel detectar o dominio dos cookies' };
+      }
+
+      console.log(`Cookies.txt: ${cookies.length} cookies para ${url}`);
+
+      const sessionData = {
+        id: `ferramenta-${ferramenta.id}`,
+        name: ferramenta.titulo,
+        url: url,
+        cookies: JSON.stringify(cookies)
+      };
+
+      return await openSessionWindow(sessionData, ferramenta.id);
+    }
+
+    // === TIPO: SESSAO (Extensao FileHub) - Fluxo original sem modificacoes ===
     const decrypted = decryptSessionShare(ferramenta.link_ou_conteudo);
 
     console.log('Resultado descriptografia:', decrypted.success ? 'SUCESSO' : 'FALHA');

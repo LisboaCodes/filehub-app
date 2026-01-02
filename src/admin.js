@@ -756,7 +756,8 @@ function getFerramentaForm(item) {
       <div class="form-group">
         <label>Tipo de Acesso</label>
         <select id="editTipoAcesso">
-          <option value="sessao" ${item?.tipo_acesso === 'sessao' ? 'selected' : ''}>Sessao</option>
+          <option value="sessao" ${item?.tipo_acesso === 'sessao' ? 'selected' : ''}>Sessao (Extensao FileHub)</option>
+          <option value="cookies_txt" ${item?.tipo_acesso === 'cookies_txt' ? 'selected' : ''}>Cookies.txt (Netscape)</option>
           <option value="link" ${item?.tipo_acesso === 'link' ? 'selected' : ''}>Link</option>
         </select>
       </div>
@@ -770,8 +771,12 @@ function getFerramentaForm(item) {
       </div>
     </div>
     <div class="form-group">
-      <label>Link ou Conteudo (Sessao)</label>
-      <textarea id="editLinkConteudo" rows="4">${escapeHtml(item?.link_ou_conteudo || '')}</textarea>
+      <label id="labelLinkConteudo">Link ou Conteudo (Sessao)</label>
+      <textarea id="editLinkConteudo" rows="6" placeholder="Cole aqui o conteudo da sessao ou cookies.txt">${escapeHtml(item?.link_ou_conteudo || '')}</textarea>
+      <small id="helpLinkConteudo" style="color: #888; margin-top: 5px; display: block;">
+        Sessao: Cole os dados criptografados da extensao FileHub<br>
+        Cookies.txt: Cole o conteudo do arquivo cookies.txt exportado
+      </small>
     </div>
   `;
 }
