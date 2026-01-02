@@ -1,347 +1,409 @@
 # FileHub
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="Version">
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/version-1.2.2-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/platform-Windows-lightgrey.svg" alt="Platform">
   <img src="https://img.shields.io/badge/electron-28.0.0-47848F.svg" alt="Electron">
 </p>
 
-**FileHub** é um gerenciador de sessões compartilhadas que permite aos usuários acessar ferramentas online já logadas. Ideal para equipes que precisam compartilhar acessos de forma segura.
+**FileHub** e um aplicativo desktop para gerenciamento de sessoes compartilhadas, ferramentas de IA e recursos premium. Permite que usuarios acessem ferramentas online ja logadas de forma segura e controlada.
+
+---
+
+## Indice
+
+- [Funcionalidades](#funcionalidades)
+- [Instalacao](#instalacao)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Administracao](#administracao)
+- [Tipos de Acesso](#tipos-de-acesso)
+- [Sistema de Paginas](#sistema-de-paginas)
+- [Atualizacao Automatica](#atualizacao-automatica)
+- [Desenvolvimento](#desenvolvimento)
+- [Historico de Versoes](#historico-de-versoes)
+- [Tarefas Pendentes](#tarefas-pendentes)
+- [Seguranca](#seguranca)
 
 ---
 
 ## Funcionalidades
 
-- **Login seguro** - Autenticação via banco de dados MySQL
-- **Controle de acesso por plano** - Cada usuário vê apenas as ferramentas do seu plano
-- **Sessões compartilhadas** - Abre ferramentas já logadas com cookies injetados
-- **Status das ferramentas** - Online, Manutenção ou Offline
-- **Auto-update** - Atualização automática quando há nova versão
-- **Multiplataforma** - Windows, macOS e Linux
-- **PWA** - Versão web que funciona no celular
+### Para Usuarios
+
+| Funcionalidade | Descricao |
+|----------------|-----------|
+| **Inteligencia Artificial** | Acesso a ferramentas de IA (ChatGPT, Midjourney, CapCut, etc.) |
+| **Canva** | Arquivos e acessos ao Canva Pro |
+| **Acessos Premium** | Credenciais de plataformas premium |
+| **Materiais** | Downloads de materiais exclusivos |
+| **Meu Perfil** | Gerenciamento de dados pessoais e avatar |
+| **Planos** | Visualizacao e comparativo de planos |
+| **Dashboard** | Banners e destaques (quando ativo) |
+
+### Para Administradores
+
+| Funcionalidade | Descricao |
+|----------------|-----------|
+| **Admin - Usuarios** | CRUD completo de usuarios, planos e status |
+| **Admin - IA** | Gerenciamento de ferramentas de IA |
+| **Admin - Acessos Premium** | Gerenciamento de credenciais |
+| **Admin - Canva** | Categorias, arquivos e acessos |
+| **Admin - Tools** | Menu dinamico de ferramentas |
+| **Admin - Reports** | Visualizacao de reports/denuncias |
+| **Admin - Planos** | Gerenciamento de planos e detalhes |
+| **Admin - Dashboard** | Banners e covers do dashboard |
+| **Admin - Menu** | Ativar/desativar paginas do sistema |
+
+### Recursos do Sistema
+
+- **Login seguro** com hash bcrypt
+- **Sessao unica por conta** - impede login simultaneo
+- **Controle de acesso por plano** - cada usuario ve apenas suas ferramentas
+- **Sessoes compartilhadas** - ferramentas ja logadas com cookies
+- **Auto-update** - atualizacao automatica via GitHub
+- **Tema dark** - interface moderna e confortavel
 
 ---
 
-## Screenshots
-
-| Login | Dashboard |
-|-------|-----------|
-| Tela de login segura | Grid de ferramentas com cards |
-
----
-
-## Instalação
+## Instalacao
 
 ### Download
-Baixe a versão mais recente na [página de Releases](../../releases/latest):
+Baixe a versao mais recente na [pagina de Releases](https://github.com/LisboaCodes/filehub-app/releases/latest):
 
 | Sistema | Arquivo |
 |---------|---------|
-| Windows | `FileHub-Setup-X.X.X.exe` |
-| macOS | `FileHub-X.X.X-arm64.dmg` ou `FileHub-X.X.X-x64.dmg` |
-| Linux | `FileHub-X.X.X.AppImage` ou `FileHub-X.X.X.deb` |
+| Windows | `FileHub-Setup-1.2.2.exe` |
 
-### Instalação Windows
+### Instalacao Windows
 1. Baixe `FileHub-Setup-X.X.X.exe`
 2. Execute o instalador
-3. Siga as instruções na tela
-4. O app será instalado e criará atalho na área de trabalho
+3. Siga as instrucoes na tela
+4. O app criara atalho na area de trabalho
 
-### Instalação macOS
-1. Baixe o arquivo `.dmg` correspondente à sua arquitetura
-2. Abra o arquivo DMG
-3. Arraste o FileHub para a pasta Applications
-4. Na primeira execução, clique com botão direito > Abrir
+---
 
-### Instalação Linux
-```bash
-# AppImage
-chmod +x FileHub-X.X.X.AppImage
-./FileHub-X.X.X.AppImage
+## Estrutura do Projeto
 
-# Debian/Ubuntu
-sudo dpkg -i FileHub-X.X.X.deb
+```
+FILEHUB/
+├── main.js                 # Processo principal do Electron
+├── preload.js              # Bridge de seguranca IPC
+├── package.json            # Dependencias e configuracao de build
+├── README.md               # Este arquivo
+├── src/
+│   ├── index.html          # Pagina principal (todas as telas)
+│   ├── login.html          # Pagina de login
+│   ├── renderer.js         # Logica do frontend principal
+│   ├── admin.js            # Logica do painel administrativo
+│   ├── styles.css          # Estilos CSS (tema dark)
+│   ├── icons.js            # Icones Lucide SVG
+│   ├── database.js         # Electron Store (dados locais)
+│   └── login.js            # Logica da tela de login
+├── build/                  # Assets para build (icones)
+│   └── icon.ico            # Icone do aplicativo
+├── dist/                   # Arquivos de distribuicao gerados
+│   ├── FileHub-Setup-X.X.X.exe
+│   └── latest.yml
+└── node_modules/           # Dependencias
 ```
 
 ---
 
-## Uso
+## Administracao
 
-### Primeiro Acesso
-1. Abra o FileHub
-2. Digite seu e-mail e senha cadastrados
-3. Clique em "Entrar"
+### Niveis de Acesso
 
-### Acessando Ferramentas
-1. Na tela principal, você verá as ferramentas disponíveis para seu plano
-2. Clique em "Acessar" para abrir a ferramenta já logada
-3. Clique em "Info" para ver detalhes da ferramenta
+| Nivel | Permissoes |
+|-------|------------|
+| **Admin** | Acesso total ao sistema + painel admin |
+| **Colaborador** | Acesso a todas as ferramentas |
+| **Moderador** | Acesso a ferramentas + visualizar reports |
+| **Usuario** | Acesso conforme plano contratado |
 
-### Status das Ferramentas
-- **Verde (Online)** - Ferramenta disponível para uso
-- **Amarelo (Manutenção)** - Ferramenta temporariamente indisponível
-- **Vermelho (Offline)** - Ferramenta fora do ar
-- **Cadeado** - Seu plano não tem acesso (faça upgrade)
+### Status de Usuario
 
-### Atualizações
-O app verifica automaticamente por atualizações ao iniciar. Quando uma atualização está disponível:
-1. Um popup aparece perguntando se deseja baixar
-2. Clique em "Baixar Agora"
-3. Após o download, clique em "Reiniciar Agora"
-4. O app reinicia com a nova versão
+| Status | Descricao |
+|--------|-----------|
+| `ativo` | Usuario pode acessar normalmente |
+| `desativado` | Conta desativada pelo admin |
+| `banido` | Conta banida por violacao |
+| `inadimplente` | Pagamento pendente |
+| `trial` | Periodo de teste |
+
+---
+
+## Tipos de Acesso
+
+As ferramentas de IA suportam 3 tipos de acesso:
+
+### 1. Sessao (Extensao FileHub)
+- Usa a extensao FileHub para capturar sessao
+- Dados criptografados com AES-256
+- Formato: dados criptografados ou JSON
+
+### 2. Cookies.txt (Netscape) - NOVO v1.2.2
+- Usa a extensao "Get cookies.txt LOCALLY"
+- Formato padrao Netscape compativel com curl/wget
+- Detecta automaticamente o dominio
+
+**Como usar:**
+1. Instale a extensao "Get cookies.txt LOCALLY" no Chrome
+2. Acesse o site e faca login
+3. Clique na extensao e exporte os cookies
+4. No Admin > IA, selecione tipo "Cookies.txt (Netscape)"
+5. Cole o conteudo do arquivo
+6. Salve
+
+### 3. Link
+- Abre URL diretamente no navegador padrao
+- Sem injecao de cookies
+
+---
+
+## Sistema de Paginas
+
+### Ativar/Desativar Paginas (v1.2.1)
+
+Administradores podem controlar quais paginas aparecem no menu:
+
+1. Acesse **Administracao > Menu**
+2. Clique em **Editar** no item desejado
+3. Altere o **Status** para Ativo ou Inativo
+4. Clique em **Salvar**
+5. Reabra o app para ver as mudancas
+
+### Comportamento
+
+| Situacao | Resultado |
+|----------|-----------|
+| Pagina inativa | Nao aparece no menu |
+| Tentar acessar pagina inativa | Redireciona para pagina inicial |
+| Dashboard inativo | Pagina inicial = Perfil |
+| Dashboard ativo | Pagina inicial = Dashboard |
+
+### Paginas Configuraveis
+
+- Dashboard (desativado por padrao)
+- Inteligencia Artificial
+- Arquivos Canva
+- Acesso Canva
+- Acessos Premium
+- Materiais
+- Meu Perfil
+- Planos
+
+---
+
+## Atualizacao Automatica
+
+O FileHub usa **electron-updater** para atualizacoes automaticas.
+
+### Como Funciona
+
+1. Ao abrir, verifica se ha nova versao no GitHub Releases
+2. Se houver, baixa automaticamente em background
+3. Mostra overlay de progresso durante download
+4. Instala automaticamente ao fechar o app
+
+### Criar Nova Release
+
+```bash
+# 1. Atualizar versao no package.json
+# 2. Commit das alteracoes
+git add . && git commit -m "v1.x.x - Descricao" && git push
+
+# 3. Criar tag
+git tag v1.x.x && git push origin v1.x.x
+
+# 4. Build do instalador
+npm run build:win
+
+# 5. Criar release no GitHub com:
+#    - FileHub-Setup-1.x.x.exe
+#    - latest.yml
+```
 
 ---
 
 ## Desenvolvimento
 
-### Pré-requisitos
+### Pre-requisitos
 - Node.js 18+
-- npm ou yarn
-- Git
+- npm
 
-### Instalação do Ambiente
+### Instalacao do Ambiente
+
 ```bash
-# Clone o repositório
-git clone https://github.com/SEU_USUARIO/filehub.git
-cd filehub
+# Clone o repositorio
+git clone https://github.com/LisboaCodes/filehub-app.git
+cd filehub-app
 
-# Instale as dependências
+# Instale as dependencias
 npm install
 
 # Execute em modo desenvolvimento
 npm start
 ```
 
-### Estrutura do Projeto
-```
-filehub/
-├── main.js              # Processo principal Electron
-├── preload.js           # Bridge IPC segura
-├── package.json         # Configurações e dependências
-├── src/                 # Interface do app Electron
-│   ├── index.html       # Tela principal
-│   ├── login.html       # Tela de login
-│   ├── styles.css       # Estilos
-│   ├── renderer.js      # Lógica da tela principal
-│   ├── login.js         # Lógica do login
-│   └── database.js      # SQLite local
-├── web/                 # PWA (versão web/mobile)
-│   ├── index.html
-│   ├── styles.css
-│   ├── app.js
-│   ├── sw.js
-│   ├── manifest.json
-│   └── api.php
-├── build/               # Recursos do instalador (ícones)
-├── dist/                # Instaladores gerados
-└── assets/              # Recursos adicionais
-```
+### Scripts Disponiveis
 
-### Scripts Disponíveis
-```bash
-npm start          # Inicia o app em desenvolvimento
-npm run dev        # Inicia com logs detalhados
-npm run build      # Cria instalador para o SO atual
-npm run build:win  # Cria instalador Windows
-npm run build:mac  # Cria instalador macOS
-npm run build:linux # Cria instalador Linux
-npm run publish    # Publica release no GitHub
-```
+| Comando | Descricao |
+|---------|-----------|
+| `npm start` | Executa o app em desenvolvimento |
+| `npm run dev` | Executa com logging habilitado |
+| `npm run build:win` | Gera instalador Windows (.exe) |
+| `npm run build:mac` | Gera instalador macOS (.dmg) |
+| `npm run build:linux` | Gera instalador Linux (.AppImage) |
+
+### Tecnologias
+
+| Tecnologia | Uso |
+|------------|-----|
+| Electron 28 | Framework desktop |
+| MySQL2 | Banco de dados remoto |
+| bcryptjs | Hash de senhas |
+| CryptoJS | Criptografia de sessoes |
+| electron-updater | Auto-update |
+| Electron Store | Dados locais |
 
 ---
 
-## Build e Distribuição
+## Historico de Versoes
 
-### Criando Instaladores Localmente
-```bash
-# Windows
-npm run build:win
+### v1.2.2 (02/01/2026) - Atual
+- Adicionado suporte a **Cookies.txt (Netscape)**
+- Novo tipo de acesso para ferramentas de IA
+- Parser automatico de formato Netscape
+- Deteccao automatica de dominio dos cookies
 
-# macOS (requer macOS)
-npm run build:mac
+### v1.2.1 (31/12/2025)
+- Sistema de **ativar/desativar paginas**
+- Dashboard desativado por padrao
+- Gerenciamento via Admin > Menu
+- Navegacao inteligente para paginas ativas
 
-# Linux
-npm run build:linux
+### v1.2.0 (31/12/2025)
+- **Sessao unica por conta**
+- Detecta login em outro dispositivo
+- Alerta e logout automatico
+- Token de sessao no banco
 
-# Todos (requer macOS para dmg)
-npm run build:all
-```
+### v1.1.9 (30/12/2025)
+- Ajuste no footer da tela de login
 
-Os instaladores serão gerados na pasta `dist/`.
+### v1.1.8 (30/12/2025)
+- Dashboard com banners e covers
+- Admin para gerenciar dashboard
+- Melhorias gerais de UI
 
-### Publicando uma Nova Versão
+### v1.1.1 (29/12/2025)
+- Atualizacao automatica com overlay de progresso
+- Indicador visual de download
 
-#### 1. Atualize a versão
-Edite `package.json`:
-```json
-"version": "1.1.0"
-```
+### v1.1.0 (28/12/2025)
+- Dashboard com sidebar redesenhado
+- Pagina de perfil do usuario
+- Novas cores e tema dark aprimorado
 
-#### 2. Faça commit e push
-```bash
-git add .
-git commit -m "Release v1.1.0"
-git push origin main
-```
-
-#### 3. Configure o token do GitHub
-```bash
-# Windows (CMD)
-set GH_TOKEN=seu_token_aqui
-
-# Windows (PowerShell)
-$env:GH_TOKEN="seu_token_aqui"
-
-# macOS/Linux
-export GH_TOKEN=seu_token_aqui
-```
-
-#### 4. Publique
-```bash
-npm run publish
-```
-
-Isso criará automaticamente uma Release no GitHub com os instaladores.
+### v1.0.0
+- Versao inicial
+- Sistema de login e autenticacao
+- Ferramentas de IA com sessao compartilhada
+- Painel administrativo basico
 
 ---
 
-## Configuração do Banco de Dados
+## Tarefas Pendentes
 
-### Tabelas Necessárias
+### Alta Prioridade
 
-#### users
-```sql
-CREATE TABLE users (
-  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  plano_id BIGINT UNSIGNED,
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255) NOT NULL UNIQUE,
-  password VARCHAR(255) NOT NULL,
-  status ENUM('ativo', 'desativado', 'banido', 'inadimplente', 'trial') DEFAULT 'ativo',
-  nivel_acesso ENUM('admin', 'moderador', 'colaborador', 'usuario') DEFAULT 'usuario',
-  data_expiracao DATE,
-  last_seen_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-```
+- [ ] **Sistema de Notificacoes** - Push notifications para usuarios
+- [ ] **Logs de Acesso** - Registrar acessos as ferramentas
+- [ ] **Exportar Sessao** - Permitir admin exportar sessao de qualquer ferramenta
+- [ ] **Backup de Sessoes** - Backup automatico das sessoes no servidor
+- [ ] **Validacao de Cookies** - Verificar se sessao ainda esta valida
 
-#### ferramentas
-```sql
-CREATE TABLE ferramentas (
-  id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-  titulo VARCHAR(255) NOT NULL,
-  descricao TEXT,
-  link_ou_conteudo TEXT,
-  capa VARCHAR(255),
-  status ENUM('online', 'manutencao', 'offline') DEFAULT 'online',
-  tipo_acesso VARCHAR(50),
-  login VARCHAR(255),
-  senha VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-```
+### Media Prioridade
 
-#### ferramenta_plano
-```sql
-CREATE TABLE ferramenta_plano (
-  ferramenta_id BIGINT UNSIGNED NOT NULL,
-  plano_id BIGINT UNSIGNED NOT NULL,
-  PRIMARY KEY (ferramenta_id, plano_id)
-);
-```
+- [ ] **Dashboard Personalizado** - Widgets configuraveis por usuario
+- [ ] **Relatorios** - Graficos de uso e estatisticas
+- [ ] **Sistema de Cupons** - Descontos em planos
+- [ ] **Chat de Suporte** - Integrar chat com admin
+- [ ] **Multi-idioma** - Suporte a ingles e espanhol
+- [ ] **Busca Global** - Buscar em todas as secoes
 
-### Planos
-| ID | Nome |
-|----|------|
-| 1 | Básico |
-| 2 | Premium |
-| 3 | Plus |
-| 4 | Elite |
-| 5 | Colaborador |
-| 6 | Gratuito |
-| 7 | Desativado |
-| 8 | Admin |
-| 9 | Start |
-| 10 | Go |
+### Baixa Prioridade
+
+- [ ] **Tema Claro** - Opcao de tema light
+- [ ] **Atalhos de Teclado** - Navegacao rapida
+- [ ] **Favoritos** - Marcar ferramentas favoritas
+- [ ] **Historico** - Ultimas ferramentas acessadas
+- [ ] **Build para macOS** - Testar e ajustar para Mac
+- [ ] **Build para Linux** - Testar e ajustar para Linux
+
+### Melhorias Tecnicas
+
+- [ ] **Testes Automatizados** - Jest + Spectron
+- [ ] **CI/CD** - GitHub Actions para build automatico
+- [ ] **Monitoramento de Erros** - Sentry ou similar
+- [ ] **Cache de Dados** - Melhorar performance de carregamento
+- [ ] **Compressao de Assets** - Reduzir tamanho do instalador
+- [ ] **Code Splitting** - Otimizar carregamento
 
 ---
 
-## PWA (Versão Web/Mobile)
+## Seguranca
 
-A pasta `web/` contém uma versão PWA que funciona em qualquer navegador e pode ser instalada no celular.
-
-### Hospedagem
-1. Faça upload da pasta `web/` para seu servidor
-2. Edite `app.js` e configure a URL da API:
-   ```javascript
-   const API_URL = 'https://seusite.com/api/api.php';
-   ```
-3. Coloque `api.php` em seu servidor com PHP
-4. Acesse pelo navegador
-
-### Instalação no Celular
-1. Acesse a URL do PWA no navegador do celular
-2. No Chrome: Menu > "Adicionar à tela inicial"
-3. No Safari: Compartilhar > "Adicionar à Tela de Início"
+| Recurso | Implementacao |
+|---------|---------------|
+| Senhas | Hash bcrypt |
+| Sessoes | Criptografia AES-256 |
+| IPC | Context Isolation habilitado |
+| Preload | Script isolado para comunicacao |
+| Login Unico | Token de sessao no banco |
+| Cookies | Injetados em particao isolada |
 
 ---
 
-## Segurança
+## Banco de Dados
 
-- Senhas são armazenadas com hash bcrypt
-- Comunicação via IPC segura com contextIsolation
-- Cookies de sessão são criptografados com AES-256
-- Tokens de autenticação expiram em 24 horas (PWA)
+### Tabelas Principais
 
----
-
-## Solução de Problemas
-
-### O app não abre
-- Verifique se o antivírus não está bloqueando
-- Tente executar como administrador
-- Reinstale o aplicativo
-
-### Erro de conexão
-- Verifique sua conexão com a internet
-- O servidor pode estar temporariamente indisponível
-- Tente novamente em alguns minutos
-
-### Ferramenta abre em branco
-- A sessão pode ter expirado
-- Entre em contato com o administrador para atualizar os cookies
-
-### Atualização não funciona
-- Verifique sua conexão com a internet
-- Baixe manualmente da página de Releases
-
----
-
-## Contribuição
-
-1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/NovaFeature`)
-3. Commit suas mudanças (`git commit -m 'Adiciona NovaFeature'`)
-4. Push para a branch (`git push origin feature/NovaFeature`)
-5. Abra um Pull Request
-
----
-
-## Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+| Tabela | Descricao |
+|--------|-----------|
+| `users` | Usuarios do sistema |
+| `ferramentas` | Ferramentas de IA |
+| `ferramenta_plano` | Relacao ferramenta x plano |
+| `acessos_premium` | Credenciais premium |
+| `canva_categorias` | Categorias do Canva |
+| `canva_arquivos` | Arquivos do Canva |
+| `canva_acessos` | Acessos ao Canva |
+| `materiais` | Materiais para download |
+| `planos` | Planos disponiveis |
+| `planos_detalhes` | Comparativo de planos |
+| `tools` | Menu dinamico |
+| `menu_items` | Configuracao de paginas |
+| `reports` | Reports/denuncias |
+| `dashboard_banners` | Banners do dashboard |
+| `dashboard_covers` | Covers/destaques |
 
 ---
 
 ## Contato
 
+- **Repositorio:** https://github.com/LisboaCodes/filehub-app
+- **Releases:** https://github.com/LisboaCodes/filehub-app/releases
 - **Website:** [filehub.space](https://filehub.space)
-- **Email:** suporte@filehub.space
+
+---
+
+## Licenca
+
+MIT License - Veja o arquivo LICENSE para detalhes.
 
 ---
 
 <p align="center">
-  Feito com ❤️ pela equipe FileHub
+  <b>FileHub v1.2.2</b><br>
+  Desenvolvido com Electron
 </p>
