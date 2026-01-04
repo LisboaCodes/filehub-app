@@ -10,6 +10,7 @@ const Database = require('./src/database');
 // Configuracao do auto-updater
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.forceAppQuit = true;
 
 // Usuario logado atualmente
 let currentUser = null;
@@ -2040,10 +2041,26 @@ function setupAutoUpdater() {
     console.log('Atualizacao baixada:', info.version);
     mainWindow?.webContents.send('update:downloaded', info);
 
-    // Aguarda 2 segundos e instala automaticamente
+    // Aguarda 3 segundos e instala automaticamente
     setTimeout(() => {
-      autoUpdater.quitAndInstall(true, true);
-    }, 2000);
+      console.log('Iniciando instalacao da atualizacao...');
+
+      // Força o fechamento de todas as janelas
+      const allWindows = BrowserWindow.getAllWindows();
+      allWindows.forEach(win => {
+        win.removeAllListeners('close');
+        win.close();
+      });
+
+      // Força quit e install
+      autoUpdater.quitAndInstall(false, true);
+
+      // Fallback: força saida do app apos 1 segundo
+      setTimeout(() => {
+        console.log('Forcando saida do app...');
+        app.exit(0);
+      }, 1000);
+    }, 3000);
   });
 
   // Erro no update
