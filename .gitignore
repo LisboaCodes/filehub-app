@@ -37,3 +37,6 @@ release/
 nul
 NUL
 .claude/settings.local.json
+laravel/
+web.zip
+*.zip
