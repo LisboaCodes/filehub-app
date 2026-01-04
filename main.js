@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const { autoUpdater } = require('electron-updater');
 const crypto = require('crypto');
 const Database = require('./src/database');
+const api = require('./src/api'); // API do FileHub
 
 // Configuracao do auto-updater
 autoUpdater.autoDownload = true;
@@ -16,6 +17,11 @@ autoUpdater.forceAppQuit = true;
 let currentUser = null;
 let currentSessionToken = null;
 let sessionCheckInterval = null;
+
+// Flag para usar API (true) ou MySQL direto (false)
+// Quando a API estiver 100% testada, mude para true
+let USE_API = true;
+let apiOnline = false;
 
 // Configuracao do banco de dados MySQL
 const mysqlConfig = {
@@ -43,8 +49,30 @@ async function initMySQL() {
   }
 }
 
+// Busca ferramentas via API
+async function getFerramentasViaAPI() {
+  try {
+    if (!currentUser) return [];
+    api.setAuthToken(currentSessionToken);
+    const ferramentas = await api.getFerramentas();
+
+    // Admin e colaborador tem acesso a tudo
+    const isAdmin = currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8;
+    const isColaborador = currentUser.nivel_acesso === 'colaborador' || currentUser.plano_id === 5;
+    const isModerador = currentUser.nivel_acesso === 'moderador';
+
+    if (isAdmin || isColaborador || isModerador) {
+      return ferramentas.map(f => ({ ...f, temAcesso: true }));
+    }
+    return ferramentas;
+  } catch (error) {
+    console.error('Erro ao buscar ferramentas via API:', error.message);
+    return [];
+  }
+}
+
 // Busca ferramentas do banco MySQL com informacao de acesso do usuario
-async function getFerramentas() {
+async function getFerramentasMySQL() {
   try {
     if (!currentUser) {
       return [];
@@ -84,6 +112,14 @@ async function getFerramentas() {
   }
 }
 
+// Funcao principal - escolhe entre API e MySQL
+async function getFerramentas() {
+  if (USE_API && apiOnline) {
+    return await getFerramentasViaAPI();
+  }
+  return await getFerramentasMySQL();
+}
+
 // Busca uma ferramenta por ID
 async function getFerramentaById(id) {
   try {
@@ -101,7 +137,30 @@ async function getFerramentaById(id) {
 // === ACESSOS PREMIUM ===
 
 // Busca acessos premium do banco MySQL com informacao de acesso do usuario
-async function getAcessosPremium() {
+// Busca acessos premium via API
+async function getAcessosPremiumViaAPI() {
+  try {
+    if (!currentUser) return [];
+    api.setAuthToken(currentSessionToken);
+    const acessos = await api.getAcessosPremium();
+
+    // Admin e colaborador tem acesso a tudo
+    const isAdmin = currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8;
+    const isColaborador = currentUser.nivel_acesso === 'colaborador' || currentUser.plano_id === 5;
+    const isModerador = currentUser.nivel_acesso === 'moderador';
+
+    if (isAdmin || isColaborador || isModerador) {
+      return acessos.map(a => ({ ...a, temAcesso: true }));
+    }
+    return acessos;
+  } catch (error) {
+    console.error('Erro ao buscar acessos premium via API:', error.message);
+    return [];
+  }
+}
+
+// Busca acessos premium do MySQL
+async function getAcessosPremiumMySQL() {
   try {
     if (!currentUser) {
       return [];
@@ -139,6 +198,14 @@ async function getAcessosPremium() {
     console.error('Erro ao buscar acessos premium:', error.message);
     return [];
   }
+}
+
+// Funcao principal - escolhe entre API e MySQL
+async function getAcessosPremium() {
+  if (USE_API && apiOnline) {
+    return await getAcessosPremiumViaAPI();
+  }
+  return await getAcessosPremiumMySQL();
 }
 
 // Busca um acesso premium por ID
@@ -503,10 +570,42 @@ const PLANO_NAMES = {
   10: 'Go'
 };
 
-// Faz login do usuario
-async function loginUser(email, password) {
+// Faz login do usuario via API
+async function loginUserViaAPI(email, password) {
   try {
-    console.log('Tentando login para:', email);
+    console.log('Tentando login via API para:', email);
+
+    const result = await api.login(email, password);
+
+    if (!result.success) {
+      return { success: false, error: result.message || 'E-mail ou senha incorretos' };
+    }
+
+    // Salva o token da API
+    currentSessionToken = result.token;
+
+    // Adiciona nome do plano se nao veio
+    if (!result.user.plano_nome) {
+      result.user.plano_nome = PLANO_NAMES[result.user.plano_id] || 'Desconhecido';
+    }
+
+    currentUser = result.user;
+
+    console.log('Login via API bem sucedido:', result.user.name, '- Plano:', result.user.plano_nome);
+    return {
+      success: true,
+      user: result.user
+    };
+  } catch (error) {
+    console.error('Erro no login via API:', error.message);
+    return { success: false, error: 'Erro ao fazer login. Tente novamente.' };
+  }
+}
+
+// Faz login do usuario (MySQL direto - fallback)
+async function loginUserMySQL(email, password) {
+  try {
+    console.log('Tentando login via MySQL para:', email);
 
     const user = await getUserByEmail(email);
 
@@ -571,6 +670,16 @@ async function loginUser(email, password) {
     console.error('Erro no login:', error.message);
     return { success: false, error: 'Erro ao fazer login. Tente novamente.' };
   }
+}
+
+// Funcao principal de login - escolhe entre API e MySQL
+async function loginUser(email, password) {
+  // Se USE_API estiver ativo e API estiver online, usa API
+  if (USE_API && apiOnline) {
+    return await loginUserViaAPI(email, password);
+  }
+  // Senao, usa MySQL direto
+  return await loginUserMySQL(email, password);
 }
 
 // Formata data para exibicao
@@ -812,13 +921,42 @@ function createWindow() {
     show: false
   });
 
-  // Inicia na tela de login
-  mainWindow.loadFile('src/login.html');
+  // Inicia na tela de splash
+  const splashPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'assets', 'splash.html')
+    : path.join(__dirname, 'assets', 'splash.html');
+  mainWindow.loadFile(splashPath);
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow.maximize(); // Abre em tela cheia (maximizado)
+    mainWindow.maximize();
     mainWindow.show();
-    // mainWindow.webContents.openDevTools();
+
+    // Apos 2 segundos, vai para o login
+    setTimeout(async () => {
+      // Verifica se a API esta online
+      try {
+        const status = await api.checkApiStatus();
+        console.log('API Status:', status);
+        apiOnline = status.online;
+        if (apiOnline) {
+          console.log('API online - usando API para requisicoes');
+        }
+      } catch (e) {
+        console.log('API check failed, usando MySQL como fallback');
+        apiOnline = false;
+      }
+
+      // Se API nao estiver online e USE_API=true, tenta MySQL
+      if (USE_API && !apiOnline) {
+        console.log('API offline, iniciando MySQL como fallback...');
+        await initMySQL();
+      } else if (!USE_API) {
+        await initMySQL();
+      }
+
+      // Carrega a tela de login
+      mainWindow.loadFile('src/login.html');
+    }, 2000);
   });
 
   mainWindow.on('closed', () => {
