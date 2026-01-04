@@ -1,6 +1,6 @@
 {
   "name": "filehub",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Gerenciador de Sessoes Compartilhadas",
   "main": "main.js",
   "scripts": {

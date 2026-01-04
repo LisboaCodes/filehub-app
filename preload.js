@@ -81,12 +81,16 @@ contextBridge.exposeInMainWorld('api', {
   adminCreateFerramenta: (data) => ipcRenderer.invoke('admin:createFerramenta', data),
   adminUpdateFerramenta: (id, data) => ipcRenderer.invoke('admin:updateFerramenta', id, data),
   adminDeleteFerramenta: (id) => ipcRenderer.invoke('admin:deleteFerramenta', id),
+  adminGetFerramentaPlanos: (ferramentaId) => ipcRenderer.invoke('admin:getFerramentaPlanos', ferramentaId),
+  adminUpdateFerramentaPlanos: (ferramentaId, planosIds) => ipcRenderer.invoke('admin:updateFerramentaPlanos', ferramentaId, planosIds),
 
   // Acessos Premium
   adminGetAcessosPremium: () => ipcRenderer.invoke('admin:getAcessosPremiumAll'),
   adminCreateAcessoPremium: (data) => ipcRenderer.invoke('admin:createAcessoPremium', data),
   adminUpdateAcessoPremium: (id, data) => ipcRenderer.invoke('admin:updateAcessoPremium', id, data),
   adminDeleteAcessoPremium: (id) => ipcRenderer.invoke('admin:deleteAcessoPremium', id),
+  adminGetAcessoPremiumPlanos: (acessoId) => ipcRenderer.invoke('admin:getAcessoPremiumPlanos', acessoId),
+  adminUpdateAcessoPremiumPlanos: (acessoId, planosIds) => ipcRenderer.invoke('admin:updateAcessoPremiumPlanos', acessoId, planosIds),
 
   // Canva Categorias
   adminGetCanvaCategorias: () => ipcRenderer.invoke('admin:getCanvaCategoriasAll'),
@@ -105,6 +109,8 @@ contextBridge.exposeInMainWorld('api', {
   adminCreateCanvaAcesso: (data) => ipcRenderer.invoke('admin:createCanvaAcesso', data),
   adminUpdateCanvaAcesso: (id, data) => ipcRenderer.invoke('admin:updateCanvaAcesso', id, data),
   adminDeleteCanvaAcesso: (id) => ipcRenderer.invoke('admin:deleteCanvaAcesso', id),
+  adminGetCanvaAcessoPlanos: (canvaAcessoId) => ipcRenderer.invoke('admin:getCanvaAcessoPlanos', canvaAcessoId),
+  adminUpdateCanvaAcessoPlanos: (canvaAcessoId, planosIds) => ipcRenderer.invoke('admin:updateCanvaAcessoPlanos', canvaAcessoId, planosIds),
 
   // Tools
   adminGetTools: () => ipcRenderer.invoke('admin:getToolsAll'),

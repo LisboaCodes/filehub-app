@@ -538,8 +538,8 @@ function renderCards() {
 function getBotaoAcesso(ferramenta) {
   // Se usuario nao tem acesso
   if (!ferramenta.temAcesso) {
-    return `<button class="btn btn-locked btn-small" data-id="${ferramenta.id}" disabled>
-      <span class="btn-lock-icon">&#128274;</span> Upgrade
+    return `<button class="btn btn-upgrade btn-small" data-id="${ferramenta.id}">
+      <span class="btn-lock-icon">&#128274;</span> Fazer Upgrade
     </button>`;
   }
 
@@ -972,8 +972,8 @@ function renderAcessosCards() {
 function getBotaoAcessoPremium(acesso) {
   // Se usuario nao tem acesso
   if (!acesso.temAcesso) {
-    return `<button class="btn btn-locked btn-small" disabled>
-      <span class="btn-lock-icon">&#128274;</span> Upgrade
+    return `<button class="btn btn-upgrade btn-small">
+      <span class="btn-lock-icon">&#128274;</span> Fazer Upgrade
     </button>`;
   }
 
@@ -1034,6 +1034,14 @@ function setupAcessosPremiumPage() {
 
   // Clique nos cards de acessos premium
   acessosGrid.addEventListener('click', async (e) => {
+    // Botao de upgrade - vai para pagina de planos
+    const btnUpgrade = e.target.closest('.btn-upgrade');
+    if (btnUpgrade) {
+      e.stopPropagation();
+      showUpgradeModal();
+      return;
+    }
+
     const btn = e.target.closest('.btn-acesso-premium');
     if (btn) {
       e.stopPropagation();
@@ -1576,13 +1584,26 @@ function renderCanvaAcessos() {
       }
     }
 
+    // Verifica se o usuario tem acesso
+    const temAcesso = a.temAcesso !== false; // Se nao definido, assume true (compatibilidade)
+
+    // Botao baseado no acesso
+    const botao = temAcesso
+      ? `<button class="btn btn-canva canva-acesso-btn" data-canva-url="${escapeHtml(a.url)}">
+          <span>&#127912;</span> Acessar Canva
+        </button>`
+      : `<button class="btn btn-upgrade canva-upgrade-btn">
+          <span class="btn-lock-icon">&#128274;</span> Fazer Upgrade
+        </button>`;
+
     return `
-      <div class="canva-acesso-card">
+      <div class="canva-acesso-card ${!temAcesso ? 'card-locked' : ''}">
         <div class="canva-acesso-cover">
           ${capaUrl
             ? `<img src="${escapeHtml(capaUrl)}" alt="${escapeHtml(a.titulo)}">`
             : '<span class="canva-acesso-cover-placeholder">&#127912;</span>'
           }
+          ${!temAcesso ? '<div class="card-lock-overlay"><span class="lock-icon">&#128274;</span></div>' : ''}
         </div>
         <div class="canva-acesso-body">
           <h3 class="canva-acesso-title">${escapeHtml(a.titulo)}</h3>
@@ -1590,9 +1611,7 @@ function renderCanvaAcessos() {
             ? `<p class="canva-acesso-desc">${stripHtml(a.descricao)}</p>`
             : ''
           }
-          <button class="btn btn-canva canva-acesso-btn" data-canva-url="${escapeHtml(a.url)}">
-            <span>&#127912;</span> Acessar Canva
-          </button>
+          ${botao}
         </div>
       </div>
     `;
@@ -1602,6 +1621,14 @@ function renderCanvaAcessos() {
   if (!container.dataset.listenerAdded) {
     container.dataset.listenerAdded = 'true';
     container.addEventListener('click', (e) => {
+      // Botao de upgrade - vai para pagina de planos
+      const upgradeBtn = e.target.closest('.canva-upgrade-btn');
+      if (upgradeBtn) {
+        e.stopPropagation();
+        showUpgradeModal();
+        return;
+      }
+
       const btn = e.target.closest('.canva-acesso-btn');
       if (btn && btn.dataset.canvaUrl) {
         window.open(btn.dataset.canvaUrl, '_blank');
@@ -1818,11 +1845,67 @@ async function openMaterial(material) {
   }
 }
 
+// Funcao para recarregar TODOS os dados do sistema (F5)
+async function refreshAllData() {
+  try {
+    // Mostra loading
+    loadingOverlay.classList.add('active');
+
+    console.log('Recarregando todos os dados...');
+
+    // Recarrega dados do usuario
+    await loadUserInfo();
+
+    // Recarrega configuracoes de paginas
+    await loadPageSettings();
+
+    // Recarrega todos os dados
+    await Promise.all([
+      loadFerramentas(),
+      loadAcessosPremium(),
+      loadMateriais(),
+      loadTools(),
+      loadCanvaCategorias(),
+      loadCanvaAcessos()
+    ]);
+
+    // Re-renderiza a pagina atual
+    navigateTo(currentPage);
+
+    console.log('Dados recarregados com sucesso!');
+
+    // Feedback visual
+    const pageTitleEl = document.getElementById('pageTitle');
+    const originalText = pageTitleEl.textContent;
+    pageTitleEl.textContent = 'Atualizado!';
+    setTimeout(() => {
+      pageTitleEl.textContent = originalText;
+    }, 1500);
+
+  } catch (error) {
+    console.error('Erro ao recarregar dados:', error);
+    alert('Erro ao atualizar. Tente novamente.');
+  } finally {
+    loadingOverlay.classList.remove('active');
+  }
+}
+
 // Configurar event listeners
 function setupEventListeners() {
-  // Botao atualizar
-  document.getElementById('btnRefresh').addEventListener('click', async () => {
-    if (currentPage === 'acessos') {
+  // Atalho F5 para refresh completo
+  document.addEventListener('keydown', async (e) => {
+    if (e.key === 'F5') {
+      e.preventDefault(); // Impede o refresh padrao do Electron
+      await refreshAllData();
+    }
+  });
+
+  // Botao atualizar (agora faz refresh completo com Ctrl ou refresh da pagina sem)
+  document.getElementById('btnRefresh').addEventListener('click', async (e) => {
+    if (e.ctrlKey || e.shiftKey) {
+      // Ctrl+Click ou Shift+Click = refresh completo
+      await refreshAllData();
+    } else if (currentPage === 'acessos') {
       await loadAcessosPremium();
     } else if (currentPage === 'materiais') {
       await loadMateriais();
@@ -1853,6 +1936,13 @@ function setupEventListeners() {
   cardsGrid.addEventListener('click', async (e) => {
     const btn = e.target.closest('button');
     if (!btn) return;
+
+    // Botao de upgrade - vai para pagina de planos
+    if (btn.classList.contains('btn-upgrade')) {
+      e.stopPropagation();
+      showUpgradeModal();
+      return;
+    }
 
     const ferramentaId = parseInt(btn.dataset.id);
     const ferramenta = ferramentas.find(f => f.id === ferramentaId);
@@ -1972,10 +2062,10 @@ async function openFerramenta(ferramenta) {
   }
 }
 
-// Mostra modal de upgrade
+// Mostra modal de upgrade e navega para pagina de planos
 function showUpgradeModal() {
-  const planoAtual = currentUser?.plano_nome || 'Atual';
-  alert(`Seu plano ${planoAtual} nao tem acesso a esta ferramenta.\n\nFaca um upgrade para continuar.`);
+  // Navega para a pagina de planos
+  navigateTo('planos');
 }
 
 // Mostra modal para configurar URL da sessao

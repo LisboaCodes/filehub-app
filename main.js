@@ -257,13 +257,42 @@ async function getCanvaArquivoById(id) {
   }
 }
 
-// Busca acessos do Canva
+// Busca acessos do Canva com verificacao de permissao
 async function getCanvaAcessos() {
   try {
+    if (!currentUser) {
+      console.log('Usuario nao logado para buscar acessos Canva');
+      return [];
+    }
+
+    // Admin e colaborador tem acesso a tudo
+    const isAdmin = currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8;
+    const isColaborador = currentUser.nivel_acesso === 'colaborador' || currentUser.plano_id === 5;
+    const isModerador = currentUser.nivel_acesso === 'moderador';
+
+    // Busca todos os acessos canva
     const [acessos] = await mysqlPool.execute(
       'SELECT * FROM canva_acessos WHERE status = 1 ORDER BY titulo ASC'
     );
-    return acessos;
+
+    // Se for admin, colaborador ou moderador, tem acesso a tudo
+    if (isAdmin || isColaborador || isModerador) {
+      return acessos.map(a => ({ ...a, temAcesso: true }));
+    }
+
+    // Busca quais acessos canva o plano do usuario tem acesso
+    const [permissoes] = await mysqlPool.execute(
+      'SELECT canva_acesso_id FROM canva_acesso_plano WHERE plano_id = ?',
+      [currentUser.plano_id]
+    );
+
+    const acessosComPermissao = new Set(permissoes.map(p => p.canva_acesso_id));
+
+    // Marca cada acesso se o usuario tem permissao
+    return acessos.map(a => ({
+      ...a,
+      temAcesso: acessosComPermissao.has(a.id)
+    }));
   } catch (error) {
     console.error('Erro ao buscar acessos Canva:', error.message);
     return [];
@@ -1436,7 +1465,51 @@ ipcMain.handle('admin:deleteFerramenta', async (event, id) => {
     return { success: false, error: 'Acesso negado' };
   }
   try {
+    // Remove permissoes de planos associadas
+    await mysqlPool.execute('DELETE FROM ferramenta_plano WHERE ferramenta_id = ?', [id]);
+    // Remove a ferramenta
     await mysqlPool.execute('DELETE FROM ferramentas WHERE id = ?', [id]);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Buscar quais planos tem acesso a uma ferramenta
+ipcMain.handle('admin:getFerramentaPlanos', async (event, ferramentaId) => {
+  if (!isCurrentUserAdmin()) {
+    return { success: false, error: 'Acesso negado' };
+  }
+  try {
+    const [planos] = await mysqlPool.execute(
+      'SELECT plano_id FROM ferramenta_plano WHERE ferramenta_id = ?',
+      [ferramentaId]
+    );
+    return { success: true, data: planos.map(p => p.plano_id) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Atualizar quais planos tem acesso a uma ferramenta
+ipcMain.handle('admin:updateFerramentaPlanos', async (event, ferramentaId, planosIds) => {
+  if (!isCurrentUserAdmin()) {
+    return { success: false, error: 'Acesso negado' };
+  }
+  try {
+    // Remove todas as permissoes atuais
+    await mysqlPool.execute('DELETE FROM ferramenta_plano WHERE ferramenta_id = ?', [ferramentaId]);
+
+    // Insere as novas permissoes
+    if (planosIds && planosIds.length > 0) {
+      for (const planoId of planosIds) {
+        await mysqlPool.execute(
+          'INSERT INTO ferramenta_plano (ferramenta_id, plano_id) VALUES (?, ?)',
+          [ferramentaId, planoId]
+        );
+      }
+    }
+
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -1504,7 +1577,52 @@ ipcMain.handle('admin:deleteAcessoPremium', async (event, id) => {
     return { success: false, error: 'Acesso negado' };
   }
   try {
+    // Remove permissoes de planos associadas
+    await mysqlPool.execute('DELETE FROM acesso_premium_plano WHERE acesso_premium_id = ?', [id]);
+    // Remove o acesso premium
     await mysqlPool.execute('DELETE FROM acesso_premiums WHERE id = ?', [id]);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Buscar quais planos tem acesso a um acesso premium
+ipcMain.handle('admin:getAcessoPremiumPlanos', async (event, acessoId) => {
+  if (!isCurrentUserAdmin()) {
+    return { success: false, error: 'Acesso negado' };
+  }
+  try {
+    const [planos] = await mysqlPool.execute(
+      'SELECT plano_id FROM acesso_premium_plano WHERE acesso_premium_id = ?',
+      [acessoId]
+    );
+    return { success: true, data: planos.map(p => p.plano_id) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Atualizar quais planos tem acesso a um acesso premium
+ipcMain.handle('admin:updateAcessoPremiumPlanos', async (event, acessoId, planosIds) => {
+  if (!isCurrentUserAdmin()) {
+    return { success: false, error: 'Acesso negado' };
+  }
+  try {
+    // Remove todas as permissoes atuais
+    await mysqlPool.execute('DELETE FROM acesso_premium_plano WHERE acesso_premium_id = ?', [acessoId]);
+
+    // Insere as novas permissoes
+    if (planosIds && planosIds.length > 0) {
+      const values = planosIds.map(planoId => [acessoId, planoId]);
+      for (const [acessoPremiumId, planoId] of values) {
+        await mysqlPool.execute(
+          'INSERT INTO acesso_premium_plano (acesso_premium_id, plano_id) VALUES (?, ?)',
+          [acessoPremiumId, planoId]
+        );
+      }
+    }
+
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -1769,7 +1887,51 @@ ipcMain.handle('admin:deleteCanvaAcesso', async (event, id) => {
     return { success: false, error: 'Acesso negado' };
   }
   try {
+    // Remove permissoes de planos associadas
+    await mysqlPool.execute('DELETE FROM canva_acesso_plano WHERE canva_acesso_id = ?', [id]);
+    // Remove o acesso canva
     await mysqlPool.execute('DELETE FROM canva_acessos WHERE id = ?', [id]);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Buscar quais planos tem acesso a um acesso canva
+ipcMain.handle('admin:getCanvaAcessoPlanos', async (event, canvaAcessoId) => {
+  if (!isCurrentUserAdmin()) {
+    return { success: false, error: 'Acesso negado' };
+  }
+  try {
+    const [planos] = await mysqlPool.execute(
+      'SELECT plano_id FROM canva_acesso_plano WHERE canva_acesso_id = ?',
+      [canvaAcessoId]
+    );
+    return { success: true, data: planos.map(p => p.plano_id) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Atualizar quais planos tem acesso a um acesso canva
+ipcMain.handle('admin:updateCanvaAcessoPlanos', async (event, canvaAcessoId, planosIds) => {
+  if (!isCurrentUserAdmin()) {
+    return { success: false, error: 'Acesso negado' };
+  }
+  try {
+    // Remove todas as permissoes atuais
+    await mysqlPool.execute('DELETE FROM canva_acesso_plano WHERE canva_acesso_id = ?', [canvaAcessoId]);
+
+    // Insere as novas permissoes
+    if (planosIds && planosIds.length > 0) {
+      for (const planoId of planosIds) {
+        await mysqlPool.execute(
+          'INSERT INTO canva_acesso_plano (canva_acesso_id, plano_id) VALUES (?, ?)',
+          [canvaAcessoId, planoId]
+        );
+      }
+    }
+
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };

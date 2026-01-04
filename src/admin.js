@@ -16,6 +16,9 @@ let adminPlanosDetalhes = [];
 let currentFilterCategoria = '';
 let currentEditType = null;
 let currentEditId = null;
+let currentAcessoPremiumPlanos = []; // Planos que tem acesso ao acesso premium atual
+let currentFerramentaPlanos = []; // Planos que tem acesso a ferramenta atual
+let currentCanvaAcessoPlanos = []; // Planos que tem acesso ao acesso canva atual
 
 // Verifica se o usuario e admin
 function isAdmin() {
@@ -578,7 +581,7 @@ function getToolParentLabel(parentId) {
 // MODAL DE EDICAO
 // =============================================
 
-function openAdminModal(type, id) {
+async function openAdminModal(type, id) {
   currentEditType = type;
   currentEditId = id;
 
@@ -603,12 +606,42 @@ function openAdminModal(type, id) {
     case 'ferramenta':
       title.textContent = id ? 'Editar Ferramenta' : 'Nova Ferramenta';
       item = adminFerramentas.find(f => f.id === id);
+      // Carrega os planos da plataforma se ainda nao carregou
+      if (adminPlanosPlataforma.length === 0) {
+        const planosResult = await window.api.adminGetPlanosPlataforma();
+        if (planosResult.success) {
+          adminPlanosPlataforma = planosResult.data;
+        }
+      }
+      // Carrega quais planos tem acesso a esta ferramenta
+      currentFerramentaPlanos = [];
+      if (id) {
+        const permissoesResult = await window.api.adminGetFerramentaPlanos(id);
+        if (permissoesResult.success) {
+          currentFerramentaPlanos = permissoesResult.data;
+        }
+      }
       formHtml = getFerramentaForm(item);
       break;
 
     case 'acesso-premium':
       title.textContent = id ? 'Editar Acesso Premium' : 'Novo Acesso Premium';
       item = adminAcessosPremium.find(a => a.id === id);
+      // Carrega os planos da plataforma se ainda nao carregou
+      if (adminPlanosPlataforma.length === 0) {
+        const planosResult = await window.api.adminGetPlanosPlataforma();
+        if (planosResult.success) {
+          adminPlanosPlataforma = planosResult.data;
+        }
+      }
+      // Carrega quais planos tem acesso a este acesso premium
+      currentAcessoPremiumPlanos = [];
+      if (id) {
+        const permissoesResult = await window.api.adminGetAcessoPremiumPlanos(id);
+        if (permissoesResult.success) {
+          currentAcessoPremiumPlanos = permissoesResult.data;
+        }
+      }
       formHtml = getAcessoPremiumForm(item);
       break;
 
@@ -627,6 +660,21 @@ function openAdminModal(type, id) {
     case 'canva-acesso':
       title.textContent = id ? 'Editar Acesso Canva' : 'Novo Acesso Canva';
       item = adminCanvaAcessos.find(a => a.id === id);
+      // Carrega os planos da plataforma se ainda nao carregou
+      if (adminPlanosPlataforma.length === 0) {
+        const planosResult = await window.api.adminGetPlanosPlataforma();
+        if (planosResult.success) {
+          adminPlanosPlataforma = planosResult.data;
+        }
+      }
+      // Carrega quais planos tem acesso a este acesso canva
+      currentCanvaAcessoPlanos = [];
+      if (id) {
+        const permissoesResult = await window.api.adminGetCanvaAcessoPlanos(id);
+        if (permissoesResult.success) {
+          currentCanvaAcessoPlanos = permissoesResult.data;
+        }
+      }
       formHtml = getCanvaAcessoForm(item);
       break;
 
@@ -739,6 +787,18 @@ function getUsuarioForm(user) {
 }
 
 function getFerramentaForm(item) {
+  // Gera checkboxes dos planos
+  const planosCheckboxes = adminPlanosPlataforma.map(plano => {
+    const isChecked = currentFerramentaPlanos.includes(plano.id);
+    return `
+      <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #1a1a2e; border-radius: 6px; cursor: pointer;">
+        <input type="checkbox" class="plano-checkbox" value="${plano.id}" ${isChecked ? 'checked' : ''}>
+        <span style="color: ${plano.cor_destaque || '#fff'};">${escapeHtml(plano.nome)}</span>
+        <small style="color: #888; margin-left: auto;">R$ ${parseFloat(plano.valor || 0).toFixed(2)}</small>
+      </label>
+    `;
+  }).join('');
+
   return `
     <div class="form-group">
       <label>Titulo *</label>
@@ -778,10 +838,29 @@ function getFerramentaForm(item) {
         Cookies.txt: Cole o conteudo do arquivo cookies.txt exportado
       </small>
     </div>
+    <div class="form-group">
+      <label style="margin-bottom: 10px; display: block;">Planos com Acesso</label>
+      <div class="planos-checkboxes" style="display: flex; flex-direction: column; gap: 8px;">
+        ${planosCheckboxes.length > 0 ? planosCheckboxes : '<span style="color: #888;">Nenhum plano cadastrado</span>'}
+      </div>
+      <small style="color: #888; margin-top: 8px; display: block;">Selecione quais planos terao acesso a esta ferramenta</small>
+    </div>
   `;
 }
 
 function getAcessoPremiumForm(item) {
+  // Gera checkboxes dos planos
+  const planosCheckboxes = adminPlanosPlataforma.map(plano => {
+    const isChecked = currentAcessoPremiumPlanos.includes(plano.id);
+    return `
+      <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #1a1a2e; border-radius: 6px; cursor: pointer;">
+        <input type="checkbox" class="plano-checkbox" value="${plano.id}" ${isChecked ? 'checked' : ''}>
+        <span style="color: ${plano.cor_destaque || '#fff'};">${escapeHtml(plano.nome)}</span>
+        <small style="color: #888; margin-left: auto;">R$ ${parseFloat(plano.valor || 0).toFixed(2)}</small>
+      </label>
+    `;
+  }).join('');
+
   return `
     <div class="form-group">
       <label>Titulo *</label>
@@ -830,6 +909,13 @@ function getAcessoPremiumForm(item) {
     <div class="form-group">
       <label>Chave de Acesso</label>
       <textarea id="editChave" rows="3">${escapeHtml(item?.chave_de_acesso || '')}</textarea>
+    </div>
+    <div class="form-group">
+      <label style="margin-bottom: 10px; display: block;">Planos com Acesso</label>
+      <div class="planos-checkboxes" style="display: flex; flex-direction: column; gap: 8px;">
+        ${planosCheckboxes.length > 0 ? planosCheckboxes : '<span style="color: #888;">Nenhum plano cadastrado</span>'}
+      </div>
+      <small style="color: #888; margin-top: 8px; display: block;">Selecione quais planos terao acesso a este recurso</small>
     </div>
   `;
 }
@@ -902,6 +988,18 @@ function getCanvaArquivoForm(item) {
 }
 
 function getCanvaAcessoForm(item) {
+  // Gera checkboxes dos planos
+  const planosCheckboxes = adminPlanosPlataforma.map(plano => {
+    const isChecked = currentCanvaAcessoPlanos.includes(plano.id);
+    return `
+      <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #1a1a2e; border-radius: 6px; cursor: pointer;">
+        <input type="checkbox" class="plano-checkbox" value="${plano.id}" ${isChecked ? 'checked' : ''}>
+        <span style="color: ${plano.cor_destaque || '#fff'};">${escapeHtml(plano.nome)}</span>
+        <small style="color: #888; margin-left: auto;">R$ ${parseFloat(plano.valor || 0).toFixed(2)}</small>
+      </label>
+    `;
+  }).join('');
+
   return `
     <div class="form-group">
       <label>Titulo *</label>
@@ -927,6 +1025,13 @@ function getCanvaAcessoForm(item) {
           <option value="0" ${item?.status === 0 ? 'selected' : ''}>Inativo</option>
         </select>
       </div>
+    </div>
+    <div class="form-group">
+      <label style="margin-bottom: 10px; display: block;">Planos com Acesso</label>
+      <div class="planos-checkboxes" style="display: flex; flex-direction: column; gap: 8px;">
+        ${planosCheckboxes.length > 0 ? planosCheckboxes : '<span style="color: #888;">Nenhum plano cadastrado</span>'}
+      </div>
+      <small style="color: #888; margin-top: 8px; display: block;">Selecione quais planos terao acesso a este recurso</small>
     </div>
   `;
 }
@@ -1221,11 +1326,27 @@ async function saveFerramenta() {
     link_ou_conteudo: document.getElementById('editLinkConteudo').value
   };
 
+  // Pega os planos selecionados
+  const planosCheckboxes = document.querySelectorAll('.plano-checkbox:checked');
+  const planosIds = Array.from(planosCheckboxes).map(cb => parseInt(cb.value));
+
+  let result;
+  let ferramentaId;
+
   if (currentEditId) {
-    return await window.api.adminUpdateFerramenta(currentEditId, data);
+    result = await window.api.adminUpdateFerramenta(currentEditId, data);
+    ferramentaId = currentEditId;
   } else {
-    return await window.api.adminCreateFerramenta(data);
+    result = await window.api.adminCreateFerramenta(data);
+    ferramentaId = result.id;
   }
+
+  // Salva as permissoes de planos
+  if (result.success && ferramentaId) {
+    await window.api.adminUpdateFerramentaPlanos(ferramentaId, planosIds);
+  }
+
+  return result;
 }
 
 async function saveAcessoPremium() {
@@ -1241,11 +1362,27 @@ async function saveAcessoPremium() {
     chave_de_acesso: document.getElementById('editChave').value
   };
 
+  // Pega os planos selecionados
+  const planosCheckboxes = document.querySelectorAll('.plano-checkbox:checked');
+  const planosIds = Array.from(planosCheckboxes).map(cb => parseInt(cb.value));
+
+  let result;
+  let acessoId;
+
   if (currentEditId) {
-    return await window.api.adminUpdateAcessoPremium(currentEditId, data);
+    result = await window.api.adminUpdateAcessoPremium(currentEditId, data);
+    acessoId = currentEditId;
   } else {
-    return await window.api.adminCreateAcessoPremium(data);
+    result = await window.api.adminCreateAcessoPremium(data);
+    acessoId = result.id;
   }
+
+  // Salva as permissoes de planos
+  if (result.success && acessoId) {
+    await window.api.adminUpdateAcessoPremiumPlanos(acessoId, planosIds);
+  }
+
+  return result;
 }
 
 async function saveCanvaCategoria() {
@@ -1289,11 +1426,27 @@ async function saveCanvaAcesso() {
     status: parseInt(document.getElementById('editStatus').value)
   };
 
+  // Pega os planos selecionados
+  const planosCheckboxes = document.querySelectorAll('.plano-checkbox:checked');
+  const planosIds = Array.from(planosCheckboxes).map(cb => parseInt(cb.value));
+
+  let result;
+  let canvaAcessoId;
+
   if (currentEditId) {
-    return await window.api.adminUpdateCanvaAcesso(currentEditId, data);
+    result = await window.api.adminUpdateCanvaAcesso(currentEditId, data);
+    canvaAcessoId = currentEditId;
   } else {
-    return await window.api.adminCreateCanvaAcesso(data);
+    result = await window.api.adminCreateCanvaAcesso(data);
+    canvaAcessoId = result.id;
   }
+
+  // Salva as permissoes de planos
+  if (result.success && canvaAcessoId) {
+    await window.api.adminUpdateCanvaAcessoPlanos(canvaAcessoId, planosIds);
+  }
+
+  return result;
 }
 
 async function saveTool() {

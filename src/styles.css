@@ -1036,12 +1036,20 @@ form {
 
 /* Card states */
 .card-locked {
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .card-locked:hover {
   border-color: var(--border);
   transform: none;
+}
+
+.card-locked .card-body {
+  pointer-events: auto;
+}
+
+.card-locked .btn-upgrade {
+  pointer-events: auto !important;
 }
 
 .card-manutencao {
@@ -1067,6 +1075,8 @@ form {
 
 .lock-icon {
   font-size: 32px;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
 }
 
 .card-cover {
@@ -1079,6 +1089,29 @@ form {
   color: #888;
   border: 1px solid #555;
   cursor: not-allowed;
+}
+
+.btn-upgrade {
+  background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+  color: #fff !important;
+  border: 1px solid #d68910 !important;
+  cursor: pointer !important;
+  font-weight: 600;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  position: relative;
+  z-index: 10;
+}
+
+.btn-upgrade:hover {
+  background: linear-gradient(135deg, #e67e22, #d35400) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4);
+}
+
+.btn-upgrade:disabled {
+  cursor: pointer !important;
+  pointer-events: auto !important;
 }
 
 .btn-lock-icon {
