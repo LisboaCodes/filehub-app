@@ -3,11 +3,363 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: http:;">
   <title>FileHub - Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    :root {
+      --bg: #050707;
+      --bg2: #070b0a;
+      --emerald: #10b981;
+      --emerald2: #34d399;
+      --emeraldGlow: rgba(16,185,129,.35);
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(1200px 600px at 25% -10%, rgba(16,185,129,.14), transparent 55%),
+        radial-gradient(900px 520px at 85% 10%, rgba(52,211,153,.10), transparent 55%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .bg-effects {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    canvas#stars {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .bg-effects::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(1000px 600px at 50% 10%, rgba(16,185,129,.14), transparent 60%),
+        radial-gradient(1200px 700px at 70% 55%, rgba(16,185,129,.06), transparent 55%),
+        radial-gradient(700px 480px at 15% 80%, rgba(255,255,255,.06), transparent 55%),
+        linear-gradient(180deg, rgba(0,0,0,.45), rgba(0,0,0,.80));
+      z-index: 1;
+    }
+
+    .noise {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      opacity: .05;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
+      background-size: 180px 180px;
+    }
+
+    .particles {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .particle {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: rgba(16,185,129,.35);
+      border-radius: 50%;
+      animation: particleFloat linear infinite;
+      opacity: 0;
+    }
+
+    @keyframes particleFloat {
+      from { transform: translateY(110vh) rotate(0deg); opacity: 0; }
+      10% { opacity: 0.55; }
+      90% { opacity: 0.55; }
+      to { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+    }
+
+    .login-container {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .login-box {
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 25px 80px rgba(0,0,0,.5);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-box::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      background:
+        radial-gradient(520px 240px at 25% 15%, rgba(16,185,129,.14), transparent 60%),
+        radial-gradient(450px 230px at 85% 80%, rgba(255,255,255,.08), transparent 55%);
+      opacity: .9;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .login-box > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .login-logo {
+      width: 120px;
+      height: auto;
+      margin-bottom: 15px;
+      filter: drop-shadow(0 10px 26px rgba(16,185,129,.22));
+    }
+
+    .login-subtitle {
+      color: rgba(255,255,255,.7);
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .login-form .form-group {
+      margin-bottom: 20px;
+    }
+
+    .login-form label {
+      display: block;
+      color: rgba(255,255,255,.8);
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .login-form input[type="email"],
+    .login-form input[type="password"] {
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      box-sizing: border-box;
+    }
+
+    .login-form input[type="email"]:focus,
+    .login-form input[type="password"]:focus {
+      outline: none;
+      border-color: var(--emerald);
+      background: rgba(255,255,255,.12);
+      box-shadow: 0 0 0 3px rgba(16,185,129,.2);
+    }
+
+    .login-form input::placeholder {
+      color: rgba(255,255,255,.4);
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      color: rgba(255,255,255,.7);
+      font-size: 13px;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--emerald);
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--emerald), var(--emerald2));
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 20px rgba(16,185,129,.3);
+    }
+
+    .btn-login:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(16,185,129,.4);
+    }
+
+    .btn-login:active {
+      transform: translateY(0);
+    }
+
+    .login-error {
+      margin-top: 15px;
+      padding: 12px;
+      background: rgba(239,68,68,.15);
+      border: 1px solid rgba(239,68,68,.3);
+      border-radius: 8px;
+      color: #f87171;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .login-footer {
+      margin-top: 30px;
+      text-align: center;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+
+    .login-footer p {
+      color: rgba(255,255,255,.4);
+      font-size: 11px;
+      line-height: 1.6;
+      margin: 0 0 8px 0;
+    }
+
+    .login-footer .copyright {
+      font-weight: 500;
+      color: rgba(255,255,255,.5);
+    }
+
+    .login-footer .tagline {
+      font-size: 10px;
+      color: rgba(255,255,255,.35);
+    }
+
+    .login-footer .developer {
+      font-size: 10px;
+      color: rgba(255,255,255,.35);
+      margin-top: 10px;
+    }
+
+    .login-footer a {
+      color: var(--emerald);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .login-footer a:hover {
+      color: var(--emerald2);
+      text-decoration: underline;
+    }
+
+    /* Update Overlay */
+    .update-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.9);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .update-box {
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 16px;
+      padding: 40px;
+      text-align: center;
+      max-width: 350px;
+    }
+
+    .update-icon {
+      font-size: 48px;
+      color: var(--emerald);
+      margin-bottom: 15px;
+      animation: spin 2s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .update-box h2 {
+      color: #fff;
+      font-size: 18px;
+      margin: 0 0 10px;
+    }
+
+    .update-box p {
+      color: rgba(255,255,255,.7);
+      font-size: 14px;
+      margin: 0 0 20px;
+    }
+
+    .update-progress-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .update-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--emerald), var(--emerald2));
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .update-percent {
+      color: var(--emerald) !important;
+      font-weight: 600;
+      margin-top: 10px !important;
+    }
+
+    .update-status {
+      font-size: 12px !important;
+      color: rgba(255,255,255,.5) !important;
+    }
+  </style>
 </head>
 <body>
+  <!-- Background Effects -->
+  <div class="bg-effects">
+    <canvas id="stars"></canvas>
+  </div>
+  <div class="noise"></div>
+  <div class="particles" id="particles"></div>
+
   <!-- Update Overlay -->
   <div class="update-overlay" id="updateOverlay">
     <div class="update-box">
@@ -58,11 +410,77 @@
       </form>
 
       <div class="login-footer">
-        <p>FILEHUB - 2026</p>
+        <p class="copyright">© 2026 FileHub Plus | Todos os direitos reservados</p>
+        <p class="tagline">Criado com 💚 por apaixonados por design e inovacao,<br>oferecendo recursos graficos incriveis para inspirar criatividade e transformar ideias em projetos.</p>
+        <p class="developer">Desenvolvido por: <a href="https://www.instagram.com/creativenext.ofc/" target="_blank">Creative Next</a> - CNPJ 52.875.660/0001-10</p>
       </div>
     </div>
   </div>
 
+  <script>
+    // Particulas
+    function createParticles() {
+      const particlesContainer = document.getElementById('particles');
+      const particleCount = 10;
+
+      for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = Math.random() * 100 + '%';
+
+        const size = Math.random() * 2 + 2;
+        particle.style.width = size + 'px';
+        particle.style.height = size + 'px';
+
+        particle.style.animationDuration = (Math.random() * 15 + 10) + 's';
+        particle.style.animationDelay = (Math.random() * 25 - 5) + 's';
+
+        particlesContainer.appendChild(particle);
+      }
+    }
+
+    // Starfield
+    (function() {
+      const c = document.getElementById("stars");
+      if (!c) return;
+      const ctx = c.getContext("2d");
+      let w, h, stars;
+
+      function resize() {
+        w = c.width = window.innerWidth;
+        h = c.height = window.innerHeight;
+        stars = Array.from(
+          { length: Math.min(160, Math.floor((w * h) / 13000)) },
+          () => ({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            r: Math.random() * 1.2 + 0.2,
+            a: Math.random() * 0.55 + 0.12,
+            v: Math.random() * 0.22 + 0.05
+          })
+        );
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, w, h);
+        for (const s of stars) {
+          s.y += s.v;
+          if (s.y > h + 10) { s.y = -10; s.x = Math.random() * w; }
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,255,255,${s.a})`;
+          ctx.fill();
+        }
+        requestAnimationFrame(draw);
+      }
+
+      window.addEventListener("resize", resize);
+      resize();
+      draw();
+    })();
+
+    createParticles();
+  </script>
   <script src="login.js"></script>
 </body>
 </html>
