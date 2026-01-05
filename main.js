@@ -2291,9 +2291,11 @@ app.whenReady().then(async () => {
   createWindow();
   createMenu();
 
-  // Configura auto-updater (apenas em producao)
-  if (!process.argv.includes('--dev')) {
+  // Configura auto-updater (apenas em producao/empacotado)
+  if (app.isPackaged) {
     setupAutoUpdater();
+  } else {
+    console.log('Skip checkForUpdates because application is not packed and dev update config is not forced');
   }
 
   app.on('activate', () => {
