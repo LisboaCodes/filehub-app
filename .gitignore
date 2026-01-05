@@ -40,3 +40,4 @@ NUL
 laravel/
 web.zip
 *.zip
+.claude/settings.local.json

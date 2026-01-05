@@ -52,13 +52,7 @@ function replaceMenuIcons() {
     'tools': 'tool',
     'acessos': 'star',
     'materiais': 'folder',
-    'perfil': 'user',
-    'admin': 'settings',
-    'admin-usuarios': 'users',
-    'admin-ferramentas': 'bot',
-    'admin-acessos': 'star',
-    'admin-canva': 'palette',
-    'admin-tools': 'tool'
+    'perfil': 'user'
   };
 
   // Substitui icones nos itens de navegacao
@@ -106,16 +100,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupFerramentasSearch();
   setupReportModal();
   setupPlanosDetalhesModal();
-
-  // Inicializa menu admin se for admin
-  if (typeof initAdminMenu === 'function') {
-    initAdminMenu();
-  }
-
-  // Inicializa pagina de reports admin
-  if (typeof initAdminReportsSetup === 'function') {
-    initAdminReportsSetup();
-  }
 
   // Navega para a pagina inicial (dashboard se ativo, senao perfil)
   const initialPage = getInitialPage();
@@ -250,10 +234,6 @@ function applyPageVisibility() {
 
 // Verifica se uma pagina esta ativa
 function isPageActive(page) {
-  // Paginas admin sempre ativas
-  if (page && page.startsWith('admin-')) {
-    return true;
-  }
   // Se nao existe configuracao, assume que esta ativa (fallback)
   if (activePages[page] === undefined) {
     return true;
@@ -588,7 +568,7 @@ function setupNavigation() {
 
 // Navegar para uma pagina
 function navigateTo(page) {
-  // Verifica se a pagina esta ativa (exceto paginas admin)
+  // Verifica se a pagina esta ativa
   if (!isPageActive(page)) {
     console.log(`Pagina ${page} esta inativa, redirecionando para pagina inicial`);
     page = getInitialPage();
@@ -615,18 +595,6 @@ function navigateTo(page) {
   document.getElementById('pageCanvaAcesso').classList.add('hidden');
   document.getElementById('pagePerfil').classList.add('hidden');
   document.getElementById('pagePlanos')?.classList.add('hidden');
-
-  // Esconde paginas admin
-  document.getElementById('pageAdminUsuarios')?.classList.add('hidden');
-  document.getElementById('pageAdminFerramentas')?.classList.add('hidden');
-  document.getElementById('pageAdminAcessos')?.classList.add('hidden');
-  document.getElementById('pageAdminCanva')?.classList.add('hidden');
-  document.getElementById('pageAdminTools')?.classList.add('hidden');
-  document.getElementById('pageAdminReports')?.classList.add('hidden');
-  document.getElementById('pageAdminPlanos')?.classList.add('hidden');
-  document.getElementById('pageAdminPlanosDetalhes')?.classList.add('hidden');
-  document.getElementById('pageAdminDashboard')?.classList.add('hidden');
-  document.getElementById('pageAdminMenu')?.classList.add('hidden');
 
   // Mostra a pagina selecionada
   if (page === 'dashboard') {
@@ -666,61 +634,6 @@ function navigateTo(page) {
     pageTitleEl.textContent = 'Meu Perfil';
     connectionStatus.classList.add('hidden');
     loadProfileData();
-  }
-  // Paginas Admin
-  else if (page === 'admin-usuarios') {
-    document.getElementById('pageAdminUsuarios').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Usuarios';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminPlanos === 'function') loadAdminPlanos();
-    if (typeof loadAdminUsers === 'function') loadAdminUsers();
-  } else if (page === 'admin-ferramentas') {
-    document.getElementById('pageAdminFerramentas').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Inteligencia Artificial';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminFerramentas === 'function') loadAdminFerramentas();
-  } else if (page === 'admin-acessos') {
-    document.getElementById('pageAdminAcessos').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Acessos Premium';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminAcessosPremium === 'function') loadAdminAcessosPremium();
-  } else if (page === 'admin-canva') {
-    document.getElementById('pageAdminCanva').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Canva';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminCanvaCategorias === 'function') loadAdminCanvaCategorias();
-    if (typeof loadAdminCanvaArquivos === 'function') loadAdminCanvaArquivos();
-    if (typeof loadAdminCanvaAcessos === 'function') loadAdminCanvaAcessos();
-  } else if (page === 'admin-tools') {
-    document.getElementById('pageAdminTools').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Tools';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminTools === 'function') loadAdminTools();
-  } else if (page === 'admin-reports') {
-    document.getElementById('pageAdminReports').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Reports';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminReports === 'function') loadAdminReports();
-  } else if (page === 'admin-planos') {
-    document.getElementById('pageAdminPlanos').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Planos';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminPlanosPlataforma === 'function') loadAdminPlanosPlataforma();
-  } else if (page === 'admin-planos-detalhes') {
-    document.getElementById('pageAdminPlanosDetalhes').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Detalhes dos Planos';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminPlanosDetalhes === 'function') loadAdminPlanosDetalhes();
-  } else if (page === 'admin-dashboard') {
-    document.getElementById('pageAdminDashboard').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Dashboard';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminDashboard === 'function') loadAdminDashboard();
-  } else if (page === 'admin-menu') {
-    document.getElementById('pageAdminMenu').classList.remove('hidden');
-    pageTitleEl.textContent = 'Administracao - Menu';
-    connectionStatus.classList.add('hidden');
-    if (typeof loadAdminMenuItems === 'function') loadAdminMenuItems();
   }
 }
 
@@ -1508,7 +1421,7 @@ function renderCanvaArquivosCards() {
       <div class="empty-state">
         <div class="empty-state-icon">&#127912;</div>
         <h3>Nenhum arquivo encontrado</h3>
-        <p>${currentCanvaBusca ? 'Tente outra busca' : 'Adicione arquivos no painel admin'}</p>
+        <p>${currentCanvaBusca ? 'Tente outra busca' : 'Arquivos serao adicionados em breve'}</p>
       </div>
     `;
     return;
@@ -1568,7 +1481,7 @@ function renderCanvaAcessos() {
       <div class="empty-state">
         <div class="empty-state-icon">&#128279;</div>
         <h3>Nenhum acesso configurado</h3>
-        <p>Configure acessos no painel admin</p>
+        <p>Acessos serao configurados em breve</p>
       </div>
     `;
     return;
@@ -2001,59 +1914,50 @@ async function openFerramenta(ferramenta) {
   try {
     loadingOverlay.classList.add('active');
 
-    console.log('Abrindo ferramenta:', ferramenta.titulo);
-    console.log('Tipo acesso:', ferramenta.tipo_acesso);
-    console.log('Conteudo (100 chars):', ferramenta.link_ou_conteudo?.substring(0, 100));
-
-    // Verifica se o conteudo parece ser uma sessao criptografada
+    const tipoAcesso = ferramenta.tipo_acesso || 'sessao';
     const conteudo = ferramenta.link_ou_conteudo || '';
-    const isEncrypted = conteudo.startsWith('filehub ') || conteudo.startsWith('session_paste ') || conteudo.startsWith('U2FsdGVk');
-    const isUrl = conteudo.startsWith('http://') || conteudo.startsWith('https://');
 
-    console.log('É criptografado?', isEncrypted);
-    console.log('É URL?', isUrl);
+    console.log('Abrindo ferramenta:', ferramenta.titulo);
+    console.log('Tipo acesso:', tipoAcesso);
+    console.log('Conteudo (100 chars):', conteudo.substring(0, 100));
 
-    if (isUrl && !isEncrypted) {
-      // É uma URL simples, abre direto
-      const result = await window.api.openSession({
-        id: `ferramenta-${ferramenta.id}`,
-        name: ferramenta.titulo,
-        url: conteudo,
-        cookies: '[]'
-      });
-      loadingOverlay.classList.remove('active');
-      return;
-    }
-
-    // É uma sessao criptografada, descriptografa e abre
-    const result = await window.api.openFerramenta(ferramenta);
-
-    console.log('Resultado openFerramenta:', result);
-
-    loadingOverlay.classList.remove('active');
-
-    if (!result || !result.success) {
-      // Se precisa configurar e usuario e admin, oferece opcao de configurar
-      if (result && result.needsSetup && result.isAdmin) {
-        // Mostra modal para configurar URL
-        const url = await showSessionSetupModal(ferramenta.titulo);
-
-        if (url && url.startsWith('http')) {
-          loadingOverlay.classList.add('active');
-          const blankResult = await window.api.openFerramentaBlank(ferramenta, url);
+    // Comportamento baseado no tipo_acesso
+    switch (tipoAcesso) {
+      case 'link':
+        // LINK: Apenas abre a URL no navegador (sem injetar sessao)
+        if (conteudo.startsWith('http')) {
+          await window.api.openExternal(conteudo);
           loadingOverlay.classList.remove('active');
+        } else {
+          loadingOverlay.classList.remove('active');
+          alert('URL invalida. Peca ao administrador para configurar.');
+        }
+        return;
 
-          if (blankResult.success) {
-            showSessionInstructions();
+      case 'login_senha':
+        // LOGIN_SENHA: Mostra as credenciais para o usuario copiar
+        loadingOverlay.classList.remove('active');
+        showCredentialsModal(ferramenta);
+        return;
+
+      case 'sessao':
+      case 'extensao':
+      default:
+        // SESSAO/EXTENSAO: Injeta cookies automaticamente
+        const result = await window.api.openFerramenta(ferramenta);
+
+        console.log('Resultado openFerramenta:', result);
+
+        loadingOverlay.classList.remove('active');
+
+        if (!result || !result.success) {
+          if (result && result.needsSetup) {
+            alert('Esta ferramenta ainda nao foi configurada.\n\nA sessao sera configurada em breve.');
           } else {
-            alert('Erro ao abrir sessao: ' + blankResult.error);
+            alert('Erro ao abrir ferramenta: ' + (result?.error || 'Erro desconhecido'));
           }
         }
-      } else if (result && result.needsSetup) {
-        alert('Esta ferramenta ainda nao foi configurada.\n\nPeca ao administrador para configurar a sessao.');
-      } else {
-        alert('Erro ao abrir ferramenta: ' + (result?.error || 'Erro desconhecido'));
-      }
+        return;
     }
   } catch (error) {
     loadingOverlay.classList.remove('active');
@@ -2062,83 +1966,50 @@ async function openFerramenta(ferramenta) {
   }
 }
 
+// Mostra modal com credenciais de login/senha
+function showCredentialsModal(ferramenta) {
+  const modal = document.getElementById('credentialsModal') || createCredentialsModal();
+  const loginEl = modal.querySelector('.credentials-login');
+  const senhaEl = modal.querySelector('.credentials-senha');
+  const titleEl = modal.querySelector('.credentials-title');
+
+  if (titleEl) titleEl.textContent = ferramenta.titulo;
+  if (loginEl) loginEl.textContent = ferramenta.login || 'Nao informado';
+  if (senhaEl) senhaEl.textContent = ferramenta.senha || 'Nao informado';
+
+  modal.classList.add('active');
+}
+
+// Cria modal de credenciais se nao existir
+function createCredentialsModal() {
+  const modal = document.createElement('div');
+  modal.id = 'credentialsModal';
+  modal.className = 'modal';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 400px;">
+      <button class="modal-close" onclick="this.closest('.modal').classList.remove('active')">&times;</button>
+      <h3 class="credentials-title" style="margin-bottom: 20px;">Credenciais</h3>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; font-size: 12px; color: #888; margin-bottom: 5px;">Login:</label>
+        <div class="credentials-login" style="background: #1a1a2e; padding: 10px; border-radius: 8px; font-family: monospace; cursor: pointer;" onclick="navigator.clipboard.writeText(this.textContent); alert('Login copiado!')"></div>
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; font-size: 12px; color: #888; margin-bottom: 5px;">Senha:</label>
+        <div class="credentials-senha" style="background: #1a1a2e; padding: 10px; border-radius: 8px; font-family: monospace; cursor: pointer;" onclick="navigator.clipboard.writeText(this.textContent); alert('Senha copiada!')"></div>
+      </div>
+      <p style="font-size: 11px; color: #666; text-align: center;">Clique para copiar</p>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  return modal;
+}
+
 // Mostra modal de upgrade e navega para pagina de planos
 function showUpgradeModal() {
   // Navega para a pagina de planos
   navigateTo('planos');
 }
 
-// Mostra modal para configurar URL da sessao
-function showSessionSetupModal(ferramentaTitulo) {
-  return new Promise((resolve) => {
-    const modal = document.getElementById('sessionSetupModal');
-    const title = document.getElementById('sessionSetupTitle');
-    const urlInput = document.getElementById('sessionSetupUrl');
-    const btnConfirm = document.getElementById('btnConfirmSessionSetup');
-    const btnCancel = document.getElementById('btnCancelSessionSetup');
-    const btnClose = document.getElementById('closeSessionSetup');
-
-    title.textContent = `Configurar: ${ferramentaTitulo}`;
-    urlInput.value = 'https://';
-
-    const closeModal = (url = null) => {
-      modal.classList.remove('active');
-      resolve(url);
-    };
-
-    const handleConfirm = () => {
-      const url = urlInput.value.trim();
-      if (url && url.startsWith('http')) {
-        closeModal(url);
-      } else {
-        urlInput.style.borderColor = '#ff4444';
-        urlInput.focus();
-      }
-    };
-
-    btnConfirm.onclick = handleConfirm;
-    btnCancel.onclick = () => closeModal(null);
-    btnClose.onclick = () => closeModal(null);
-
-    modal.onclick = (e) => {
-      if (e.target === modal) closeModal(null);
-    };
-
-    urlInput.onkeydown = (e) => {
-      urlInput.style.borderColor = '#444';
-      if (e.key === 'Enter') handleConfirm();
-      if (e.key === 'Escape') closeModal(null);
-    };
-
-    modal.classList.add('active');
-    urlInput.focus();
-    urlInput.select();
-  });
-}
-
-// Mostra instrucoes apos abrir sessao em branco
-function showSessionInstructions() {
-  const modal = document.getElementById('descriptionModal');
-  const titleEl = modal.querySelector('.modal-header h2') || modal.querySelector('h2');
-  const bodyEl = modal.querySelector('.modal-body') || modal.querySelector('.description-content');
-
-  if (titleEl) titleEl.textContent = 'Sessao Aberta!';
-  if (bodyEl) {
-    bodyEl.innerHTML = `
-      <div style="text-align: left; line-height: 1.8;">
-        <p><strong>Siga os passos para salvar a sessao:</strong></p>
-        <ol style="margin: 15px 0; padding-left: 20px;">
-          <li>Faca login normalmente na janela que abriu</li>
-          <li>Apos logar com sucesso, va no menu <strong>Sessao</strong></li>
-          <li>Clique em <strong>Salvar Sessao</strong> (ou pressione <kbd>Ctrl+S</kbd>)</li>
-        </ol>
-        <p style="color: #4CAF50;"><strong>Pronto!</strong> A sessao sera salva e outros usuarios poderao usar automaticamente!</p>
-      </div>
-    `;
-  }
-
-  modal.classList.add('active');
-}
 
 // Mostrar descricao
 function showDescription(ferramenta) {
@@ -2663,7 +2534,7 @@ function setupPlanosDetalhesModal() {
 // Expoe funcao globalmente
 window.openPlanosDetalhesModal = openPlanosDetalhesModal;
 
-// Expoe funcoes globalmente para outros scripts (admin.js)
+// Expoe funcoes globalmente
 window.escapeHtml = escapeHtml;
 window.stripHtml = stripHtml;
 window.navigateTo = navigateTo;

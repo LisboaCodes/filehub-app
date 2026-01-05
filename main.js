@@ -1,11 +1,10 @@
 const { app, BrowserWindow, ipcMain, session, dialog, Menu, shell } = require('electron');
 const path = require('path');
 const CryptoJS = require('crypto-js');
-const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 const { autoUpdater } = require('electron-updater');
 const crypto = require('crypto');
-const Database = require('./src/database');
+const Database = require('./src/database'); // Database local
 const api = require('./src/api'); // API do FileHub
 
 // Configuracao do auto-updater
@@ -18,36 +17,15 @@ let currentUser = null;
 let currentSessionToken = null;
 let sessionCheckInterval = null;
 
-// Flag para usar API (true) ou MySQL direto (false)
-// Quando a API estiver 100% testada, mude para true
-let USE_API = true;
-let apiOnline = false;
-
-// Configuracao do banco de dados MySQL
-const mysqlConfig = {
-  host: '157.230.211.234',
-  user: 'filehub',
-  password: 'Mel102424!@#',
-  database: 'filehub',
-  waitForConnections: true,
-  connectionLimit: 10
-};
-
-let mysqlPool = null;
-
-// Inicializa conexao MySQL
-async function initMySQL() {
-  try {
-    mysqlPool = mysql.createPool(mysqlConfig);
-    const connection = await mysqlPool.getConnection();
-    console.log('Conectado ao MySQL com sucesso!');
-    connection.release();
-    return true;
-  } catch (error) {
-    console.error('Erro ao conectar ao MySQL:', error.message);
-    return false;
-  }
-}
+// =============================================
+// SEGURANCA: MySQL DESATIVADO - USANDO APENAS API
+// =============================================
+// As credenciais do banco foram removidas por seguranca.
+// O app agora usa exclusivamente a API Laravel.
+// Variaveis mantidas para compatibilidade com codigo legado.
+const mysqlPool = null; // MySQL desativado permanentemente
+const USE_API = true;   // Sempre usar API
+const apiOnline = true; // API sempre considerada online
 
 // Busca ferramentas via API
 async function getFerramentasViaAPI() {
@@ -71,63 +49,16 @@ async function getFerramentasViaAPI() {
   }
 }
 
-// Busca ferramentas do banco MySQL com informacao de acesso do usuario
-async function getFerramentasMySQL() {
-  try {
-    if (!currentUser) {
-      return [];
-    }
-
-    // Admin e colaborador tem acesso a tudo
-    const isAdmin = currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8;
-    const isColaborador = currentUser.nivel_acesso === 'colaborador' || currentUser.plano_id === 5;
-    const isModerador = currentUser.nivel_acesso === 'moderador';
-
-    // Busca todas as ferramentas (todos os status para mostrar)
-    const [ferramentas] = await mysqlPool.execute(
-      'SELECT * FROM ferramentas ORDER BY titulo'
-    );
-
-    // Se for admin, colaborador ou moderador, tem acesso a tudo
-    if (isAdmin || isColaborador || isModerador) {
-      return ferramentas.map(f => ({ ...f, temAcesso: true }));
-    }
-
-    // Busca quais ferramentas o plano do usuario tem acesso
-    const [acessos] = await mysqlPool.execute(
-      'SELECT ferramenta_id FROM ferramenta_plano WHERE plano_id = ?',
-      [currentUser.plano_id]
-    );
-
-    const ferramentasComAcesso = new Set(acessos.map(a => a.ferramenta_id));
-
-    // Marca cada ferramenta se o usuario tem acesso
-    return ferramentas.map(f => ({
-      ...f,
-      temAcesso: ferramentasComAcesso.has(f.id)
-    }));
-  } catch (error) {
-    console.error('Erro ao buscar ferramentas:', error.message);
-    return [];
-  }
-}
-
-// Funcao principal - escolhe entre API e MySQL
+// Funcao principal - usa apenas API (MySQL removido por seguranca)
 async function getFerramentas() {
-  if (USE_API && apiOnline) {
-    return await getFerramentasViaAPI();
-  }
-  return await getFerramentasMySQL();
+  return await getFerramentasViaAPI();
 }
 
-// Busca uma ferramenta por ID
+// Busca uma ferramenta por ID (via API)
 async function getFerramentaById(id) {
   try {
-    const [rows] = await mysqlPool.execute(
-      'SELECT * FROM ferramentas WHERE id = ?',
-      [id]
-    );
-    return rows[0] || null;
+    api.setAuthToken(currentSessionToken);
+    return await api.getFerramentaById(id);
   } catch (error) {
     console.error('Erro ao buscar ferramenta:', error.message);
     return null;
@@ -136,7 +67,6 @@ async function getFerramentaById(id) {
 
 // === ACESSOS PREMIUM ===
 
-// Busca acessos premium do banco MySQL com informacao de acesso do usuario
 // Busca acessos premium via API
 async function getAcessosPremiumViaAPI() {
   try {
@@ -159,63 +89,16 @@ async function getAcessosPremiumViaAPI() {
   }
 }
 
-// Busca acessos premium do MySQL
-async function getAcessosPremiumMySQL() {
-  try {
-    if (!currentUser) {
-      return [];
-    }
-
-    // Admin e colaborador tem acesso a tudo
-    const isAdmin = currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8;
-    const isColaborador = currentUser.nivel_acesso === 'colaborador' || currentUser.plano_id === 5;
-    const isModerador = currentUser.nivel_acesso === 'moderador';
-
-    // Busca todos os acessos premium
-    const [acessos] = await mysqlPool.execute(
-      'SELECT * FROM acesso_premiums ORDER BY titulo'
-    );
-
-    // Se for admin, colaborador ou moderador, tem acesso a tudo
-    if (isAdmin || isColaborador || isModerador) {
-      return acessos.map(a => ({ ...a, temAcesso: true }));
-    }
-
-    // Busca quais acessos premium o plano do usuario tem acesso
-    const [permissoes] = await mysqlPool.execute(
-      'SELECT acesso_premium_id FROM acesso_premium_plano WHERE plano_id = ?',
-      [currentUser.plano_id]
-    );
-
-    const acessosComPermissao = new Set(permissoes.map(p => p.acesso_premium_id));
-
-    // Marca cada acesso se o usuario tem permissao
-    return acessos.map(a => ({
-      ...a,
-      temAcesso: acessosComPermissao.has(a.id)
-    }));
-  } catch (error) {
-    console.error('Erro ao buscar acessos premium:', error.message);
-    return [];
-  }
-}
-
-// Funcao principal - escolhe entre API e MySQL
+// Funcao principal - usa apenas API (MySQL removido por seguranca)
 async function getAcessosPremium() {
-  if (USE_API && apiOnline) {
-    return await getAcessosPremiumViaAPI();
-  }
-  return await getAcessosPremiumMySQL();
+  return await getAcessosPremiumViaAPI();
 }
 
-// Busca um acesso premium por ID
+// Busca um acesso premium por ID (via API)
 async function getAcessoPremiumById(id) {
   try {
-    const [rows] = await mysqlPool.execute(
-      'SELECT * FROM acesso_premiums WHERE id = ?',
-      [id]
-    );
-    return rows[0] || null;
+    api.setAuthToken(currentSessionToken);
+    return await api.getAcessoPremiumById(id);
   } catch (error) {
     console.error('Erro ao buscar acesso premium:', error.message);
     return null;
@@ -224,13 +107,11 @@ async function getAcessoPremiumById(id) {
 
 // === TOOLS (MENUS) ===
 
-// Busca menus/tools do banco MySQL organizados hierarquicamente
+// Busca menus/tools via API organizados hierarquicamente
 async function getMenuTools() {
   try {
-    // Busca todos os tools ativos que devem aparecer no app (show_app=1)
-    const [tools] = await mysqlPool.execute(
-      'SELECT * FROM tools WHERE is_active = 1 AND show_app = 1 ORDER BY ordem ASC'
-    );
+    api.setAuthToken(currentSessionToken);
+    const tools = await api.getTools();
 
     // Organiza em estrutura hierarquica (pai -> filhos)
     const toolMap = new Map();
@@ -262,12 +143,11 @@ async function getMenuTools() {
 
 // === CANVA ===
 
-// Busca categorias do Canva
+// Busca categorias do Canva via API
 async function getCanvaCategorias() {
   try {
-    const [categorias] = await mysqlPool.execute(
-      'SELECT * FROM canva_categorias WHERE status = 1 ORDER BY ordem ASC, nome ASC'
-    );
+    api.setAuthToken(currentSessionToken);
+    const categorias = await api.getCanvaCategorias();
     return categorias;
   } catch (error) {
     console.error('Erro ao buscar categorias Canva:', error.message);
@@ -275,32 +155,21 @@ async function getCanvaCategorias() {
   }
 }
 
-// Busca arquivos do Canva com filtros opcionais
+// Busca arquivos do Canva via API
 async function getCanvaArquivos(filtros = {}) {
   try {
-    let query = `
-      SELECT ca.*, cc.nome as categoria_nome
-      FROM canva_arquivos ca
-      LEFT JOIN canva_categorias cc ON ca.categoria_id = cc.id
-      WHERE ca.status = 1
-    `;
-    const params = [];
+    api.setAuthToken(currentSessionToken);
+    let arquivos = await api.getCanvaArquivos();
 
-    // Filtro por categoria
+    // Aplica filtros localmente (API retorna todos)
     if (filtros.categoria_id) {
-      query += ' AND ca.categoria_id = ?';
-      params.push(filtros.categoria_id);
+      arquivos = arquivos.filter(a => a.categoria_id === filtros.categoria_id);
     }
-
-    // Filtro por busca (nome)
     if (filtros.busca) {
-      query += ' AND ca.nome LIKE ?';
-      params.push('%' + filtros.busca + '%');
+      const busca = filtros.busca.toLowerCase();
+      arquivos = arquivos.filter(a => a.nome.toLowerCase().includes(busca));
     }
 
-    query += ' ORDER BY ca.nome ASC';
-
-    const [arquivos] = await mysqlPool.execute(query, params);
     return arquivos;
   } catch (error) {
     console.error('Erro ao buscar arquivos Canva:', error.message);
@@ -308,24 +177,19 @@ async function getCanvaArquivos(filtros = {}) {
   }
 }
 
-// Busca um arquivo Canva por ID
+// Busca um arquivo Canva por ID via API
 async function getCanvaArquivoById(id) {
   try {
-    const [rows] = await mysqlPool.execute(
-      `SELECT ca.*, cc.nome as categoria_nome
-       FROM canva_arquivos ca
-       LEFT JOIN canva_categorias cc ON ca.categoria_id = cc.id
-       WHERE ca.id = ?`,
-      [id]
-    );
-    return rows[0] || null;
+    api.setAuthToken(currentSessionToken);
+    const arquivo = await api.getCanvaArquivoById(id);
+    return arquivo;
   } catch (error) {
     console.error('Erro ao buscar arquivo Canva:', error.message);
     return null;
   }
 }
 
-// Busca acessos do Canva com verificacao de permissao
+// Busca acessos do Canva com verificacao de permissao via API
 async function getCanvaAcessos() {
   try {
     if (!currentUser) {
@@ -333,34 +197,21 @@ async function getCanvaAcessos() {
       return [];
     }
 
+    api.setAuthToken(currentSessionToken);
+    const acessos = await api.getCanvaAcessos();
+
     // Admin e colaborador tem acesso a tudo
     const isAdmin = currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8;
     const isColaborador = currentUser.nivel_acesso === 'colaborador' || currentUser.plano_id === 5;
     const isModerador = currentUser.nivel_acesso === 'moderador';
-
-    // Busca todos os acessos canva
-    const [acessos] = await mysqlPool.execute(
-      'SELECT * FROM canva_acessos WHERE status = 1 ORDER BY titulo ASC'
-    );
 
     // Se for admin, colaborador ou moderador, tem acesso a tudo
     if (isAdmin || isColaborador || isModerador) {
       return acessos.map(a => ({ ...a, temAcesso: true }));
     }
 
-    // Busca quais acessos canva o plano do usuario tem acesso
-    const [permissoes] = await mysqlPool.execute(
-      'SELECT canva_acesso_id FROM canva_acesso_plano WHERE plano_id = ?',
-      [currentUser.plano_id]
-    );
-
-    const acessosComPermissao = new Set(permissoes.map(p => p.canva_acesso_id));
-
-    // Marca cada acesso se o usuario tem permissao
-    return acessos.map(a => ({
-      ...a,
-      temAcesso: acessosComPermissao.has(a.id)
-    }));
+    // A API ja retorna com a informacao de acesso baseada no plano do usuario
+    return acessos;
   } catch (error) {
     console.error('Erro ao buscar acessos Canva:', error.message);
     return [];
@@ -372,9 +223,8 @@ async function getCanvaAcessos() {
 // Busca todos os materiais
 async function getMateriais() {
   try {
-    const [materiais] = await mysqlPool.execute(
-      'SELECT * FROM materials ORDER BY name'
-    );
+    api.setAuthToken(currentSessionToken);
+    const materiais = await api.getMateriais();
     return materiais;
   } catch (error) {
     console.error('Erro ao buscar materiais:', error.message);
@@ -519,20 +369,6 @@ function isCurrentUserAdmin() {
 
 // === AUTENTICACAO ===
 
-// Busca usuario por email
-async function getUserByEmail(email) {
-  try {
-    const [rows] = await mysqlPool.execute(
-      'SELECT * FROM users WHERE email = ?',
-      [email]
-    );
-    return rows[0] || null;
-  } catch (error) {
-    console.error('Erro ao buscar usuario:', error.message);
-    return null;
-  }
-}
-
 // Verifica se a assinatura esta valida
 function isSubscriptionValid(user) {
   if (!user.data_expiracao) {
@@ -602,84 +438,9 @@ async function loginUserViaAPI(email, password) {
   }
 }
 
-// Faz login do usuario (MySQL direto - fallback)
-async function loginUserMySQL(email, password) {
-  try {
-    console.log('Tentando login via MySQL para:', email);
-
-    const user = await getUserByEmail(email);
-
-    if (!user) {
-      console.log('Usuario nao encontrado');
-      return { success: false, error: 'E-mail ou senha incorretos' };
-    }
-
-    // Verifica a senha com bcrypt (Laravel usa bcrypt por padrao)
-    const passwordMatch = await bcrypt.compare(password, user.password);
-
-    if (!passwordMatch) {
-      console.log('Senha incorreta');
-      return { success: false, error: 'E-mail ou senha incorretos' };
-    }
-
-    // Verifica o status do usuario - so permite 'ativo'
-    if (user.status && user.status !== 'ativo') {
-      console.log('Status do usuario:', user.status);
-      const errorMsg = STATUS_MESSAGES[user.status] || 'Sua conta nao esta ativa.';
-      return { success: false, error: errorMsg, statusBlocked: true };
-    }
-
-    // Verifica se a assinatura esta valida
-    if (!isSubscriptionValid(user)) {
-      console.log('Assinatura expirada');
-      return {
-        success: false,
-        error: 'Sua assinatura expirou em ' + formatDate(user.data_expiracao),
-        expired: true
-      };
-    }
-
-    // Gera token de sessao unico
-    const sessionToken = crypto.randomUUID();
-    currentSessionToken = sessionToken;
-
-    // Atualiza last_seen_at e session_token no banco
-    await mysqlPool.execute(
-      'UPDATE users SET last_seen_at = NOW(), session_token = ?, session_updated_at = NOW() WHERE id = ?',
-      [sessionToken, user.id]
-    );
-
-    // Inicia verificacao periodica da sessao (a cada 10 segundos)
-    startSessionCheck(user.id);
-
-    // Adiciona nome do plano ao usuario
-    user.plano_nome = PLANO_NAMES[user.plano_id] || 'Desconhecido';
-
-    // Remove a senha antes de retornar
-    const { password: _, ...userWithoutPassword } = user;
-    currentUser = userWithoutPassword;
-
-    console.log('Login bem sucedido:', user.name, '- Plano:', user.plano_nome, '- Nivel:', user.nivel_acesso);
-    console.log('Avatar do usuario:', user.avatar);
-    console.log('Session token:', sessionToken);
-    return {
-      success: true,
-      user: userWithoutPassword
-    };
-  } catch (error) {
-    console.error('Erro no login:', error.message);
-    return { success: false, error: 'Erro ao fazer login. Tente novamente.' };
-  }
-}
-
-// Funcao principal de login - escolhe entre API e MySQL
+// Funcao principal de login - usa apenas API (MySQL removido por seguranca)
 async function loginUser(email, password) {
-  // Se USE_API estiver ativo e API estiver online, usa API
-  if (USE_API && apiOnline) {
-    return await loginUserViaAPI(email, password);
-  }
-  // Senao, usa MySQL direto
-  return await loginUserMySQL(email, password);
+  return await loginUserViaAPI(email, password);
 }
 
 // Formata data para exibicao
@@ -701,42 +462,11 @@ function logoutUser() {
   return { success: true };
 }
 
-// Inicia verificacao periodica da sessao
+// Inicia verificacao periodica da sessao (desativado - API valida sessao)
 function startSessionCheck(userId) {
-  // Para qualquer verificacao anterior
-  if (sessionCheckInterval) {
-    clearInterval(sessionCheckInterval);
-  }
-
-  // Verifica a cada 10 segundos
-  sessionCheckInterval = setInterval(async () => {
-    try {
-      if (!currentSessionToken || !userId) return;
-
-      const [rows] = await mysqlPool.execute(
-        'SELECT session_token FROM users WHERE id = ?',
-        [userId]
-      );
-
-      if (rows.length > 0) {
-        const dbToken = rows[0].session_token;
-
-        // Se o token do banco for diferente, outra sessao foi iniciada
-        if (dbToken && dbToken !== currentSessionToken) {
-          console.log('Sessao invalidada! Outro login detectado.');
-
-          // Notifica o renderer para mostrar alerta e deslogar
-          mainWindow?.webContents.send('session:invalidated');
-
-          // Para a verificacao
-          clearInterval(sessionCheckInterval);
-          sessionCheckInterval = null;
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao verificar sessao:', error.message);
-    }
-  }, 10000); // 10 segundos
+  // Verificacao de sessao agora e feita pela API
+  // O servidor invalida automaticamente sessoes antigas quando um novo login e feito
+  console.log('Verificacao de sessao ativa via API para usuario:', userId);
 }
 
 // Funcao para parsear cookies no formato Netscape (cookies.txt)
@@ -937,21 +667,13 @@ function createWindow() {
       try {
         const status = await api.checkApiStatus();
         console.log('API Status:', status);
-        apiOnline = status.online;
-        if (apiOnline) {
+        if (status.online) {
           console.log('API online - usando API para requisicoes');
+        } else {
+          console.log('API offline - algumas funcionalidades podem nao funcionar');
         }
       } catch (e) {
-        console.log('API check failed, usando MySQL como fallback');
-        apiOnline = false;
-      }
-
-      // Se API nao estiver online e USE_API=true, tenta MySQL
-      if (USE_API && !apiOnline) {
-        console.log('API offline, iniciando MySQL como fallback...');
-        await initMySQL();
-      } else if (!USE_API) {
-        await initMySQL();
+        console.log('Erro ao verificar API:', e.message);
       }
 
       // Carrega a tela de login
@@ -1177,29 +899,24 @@ async function saveSessionFromWindow(windowId) {
       return;
     }
 
-    // Se tem ferramentaId, salva no banco
+    // Copia sessao para clipboard (salvamento direto no banco desativado por seguranca)
+    const { clipboard } = require('electron');
+    clipboard.writeText(encrypted.data);
+
     if (windowInfo.ferramentaId) {
-      await mysqlPool.execute(
-        'UPDATE ferramentas SET link_ou_conteudo = ? WHERE id = ?',
-        [encrypted.data, windowInfo.ferramentaId]
-      );
-
-      dialog.showMessageBox(windowInfo.window, {
-        type: 'info',
-        title: 'Sessao Salva',
-        message: 'Sessao salva com sucesso!',
-        detail: `${cookies.length} cookies foram salvos para "${windowInfo.name}".\nOutros usuarios poderao acessar com esta sessao.`
-      });
-    } else {
-      // Se nao tem ferramentaId, copia para clipboard
-      const { clipboard } = require('electron');
-      clipboard.writeText(encrypted.data);
-
+      // Informa que precisa colar no painel admin
       dialog.showMessageBox(windowInfo.window, {
         type: 'info',
         title: 'Sessao Copiada',
         message: 'Dados da sessao copiados para a area de transferencia!',
-        detail: `${cookies.length} cookies foram copiados.\nCole no campo "Link ou Conteudo" da ferramenta.`
+        detail: `${cookies.length} cookies foram copiados.\n\nPara salvar, cole no campo "Link ou Conteudo" da ferramenta no painel admin (filehub.space/admin).`
+      });
+    } else {
+      dialog.showMessageBox(windowInfo.window, {
+        type: 'info',
+        title: 'Sessao Copiada',
+        message: 'Dados da sessao copiados para a area de transferencia!',
+        detail: `${cookies.length} cookies foram copiados.\nCole no campo "Link ou Conteudo" da ferramenta no painel admin.`
       });
     }
   } catch (error) {
@@ -1282,6 +999,20 @@ ipcMain.handle('db:deleteSession', (event, id) => {
 
 ipcMain.handle('session:open', async (event, sessionData) => {
   return await openSessionWindow(sessionData);
+});
+
+// Abre URL externa no navegador padrao
+ipcMain.handle('shell:openExternal', async (event, url) => {
+  try {
+    if (url && url.startsWith('http')) {
+      await shell.openExternal(url);
+      return { success: true };
+    }
+    return { success: false, error: 'URL invalida' };
+  } catch (error) {
+    console.error('Erro ao abrir URL externa:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.handle('crypto:decrypt', (event, data, password) => {
@@ -1485,77 +1216,52 @@ ipcMain.handle('materiais:open', async (event, material) => {
 // =============================================
 
 // === ADMIN - USUARIOS ===
+// NOTA: Gerenciamento de usuarios deve ser feito pelo painel admin em filehub.space/admin
+
 ipcMain.handle('admin:getUsers', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [users] = await mysqlPool.execute(
-      'SELECT id, name, email, avatar, whatsapp, plano_id, nivel_acesso, status, data_expiracao, id_filehub, security_pin, created_at FROM users ORDER BY name'
-    );
-    return { success: true, data: users };
-  } catch (error) {
-    console.error('Erro ao buscar usuarios:', error);
-    return { success: false, error: error.message };
-  }
+  // Para visualizar usuarios, use o painel admin
+  return { success: false, error: 'Para gerenciar usuarios, use o painel admin em filehub.space/admin', useAdminPanel: true, data: [] };
 });
 
 ipcMain.handle('admin:updateUser', async (event, userId, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.name !== undefined) { updates.push('name = ?'); values.push(data.name); }
-    if (data.email !== undefined) { updates.push('email = ?'); values.push(data.email); }
-    if (data.whatsapp !== undefined) { updates.push('whatsapp = ?'); values.push(data.whatsapp); }
-    if (data.plano_id !== undefined) { updates.push('plano_id = ?'); values.push(data.plano_id); }
-    if (data.nivel_acesso !== undefined) { updates.push('nivel_acesso = ?'); values.push(data.nivel_acesso); }
-    if (data.status !== undefined) { updates.push('status = ?'); values.push(data.status); }
-    if (data.data_expiracao !== undefined) { updates.push('data_expiracao = ?'); values.push(data.data_expiracao); }
-    if (data.security_pin !== undefined) { updates.push('security_pin = ?'); values.push(data.security_pin); }
-    if (data.password) {
-      const hashedPassword = await bcrypt.hash(data.password, 10);
-      updates.push('password = ?');
-      values.push(hashedPassword);
-    }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(userId);
-    await mysqlPool.execute(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao atualizar usuario:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar usuarios, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:deleteUser', async (event, userId) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    await mysqlPool.execute('DELETE FROM users WHERE id = ?', [userId]);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao deletar usuario:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar usuarios, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // === ADMIN - FERRAMENTAS ===
+// NOTA: Operacoes de escrita devem ser feitas pelo painel admin em filehub.space/admin
+
 ipcMain.handle('admin:getFerramentasAll', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [ferramentas] = await mysqlPool.execute('SELECT * FROM ferramentas ORDER BY titulo');
+    api.setAuthToken(currentSessionToken);
+    const ferramentas = await api.getFerramentas();
     return { success: true, data: ferramentas };
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error('Erro ao buscar ferramentas:', error);
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -1563,55 +1269,36 @@ ipcMain.handle('admin:createFerramenta', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      'INSERT INTO ferramentas (titulo, descricao, capa, tipo_acesso, link_ou_conteudo, status) VALUES (?, ?, ?, ?, ?, ?)',
-      [data.titulo, data.descricao || '', data.capa || '', data.tipo_acesso || 'sessao', data.link_ou_conteudo || '', data.status || 'online']
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  // Operacao de escrita - usar painel admin
+  return {
+    success: false,
+    error: 'Para criar ferramentas, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:updateFerramenta', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.titulo !== undefined) { updates.push('titulo = ?'); values.push(data.titulo); }
-    if (data.descricao !== undefined) { updates.push('descricao = ?'); values.push(data.descricao); }
-    if (data.capa !== undefined) { updates.push('capa = ?'); values.push(data.capa); }
-    if (data.tipo_acesso !== undefined) { updates.push('tipo_acesso = ?'); values.push(data.tipo_acesso); }
-    if (data.link_ou_conteudo !== undefined) { updates.push('link_ou_conteudo = ?'); values.push(data.link_ou_conteudo); }
-    if (data.status !== undefined) { updates.push('status = ?'); values.push(data.status); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE ferramentas SET ${updates.join(', ')} WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  // Operacao de escrita - usar painel admin
+  return {
+    success: false,
+    error: 'Para editar ferramentas, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:deleteFerramenta', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    // Remove permissoes de planos associadas
-    await mysqlPool.execute('DELETE FROM ferramenta_plano WHERE ferramenta_id = ?', [id]);
-    // Remove a ferramenta
-    await mysqlPool.execute('DELETE FROM ferramentas WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  // Operacao de escrita - usar painel admin
+  return {
+    success: false,
+    error: 'Para deletar ferramentas, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Buscar quais planos tem acesso a uma ferramenta
@@ -1619,15 +1306,8 @@ ipcMain.handle('admin:getFerramentaPlanos', async (event, ferramentaId) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [planos] = await mysqlPool.execute(
-      'SELECT plano_id FROM ferramenta_plano WHERE ferramenta_id = ?',
-      [ferramentaId]
-    );
-    return { success: true, data: planos.map(p => p.plano_id) };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  // Esta informacao vem junto com as ferramentas na API
+  return { success: true, data: [] };
 });
 
 // Atualizar quais planos tem acesso a uma ferramenta
@@ -1635,36 +1315,28 @@ ipcMain.handle('admin:updateFerramentaPlanos', async (event, ferramentaId, plano
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    // Remove todas as permissoes atuais
-    await mysqlPool.execute('DELETE FROM ferramenta_plano WHERE ferramenta_id = ?', [ferramentaId]);
-
-    // Insere as novas permissoes
-    if (planosIds && planosIds.length > 0) {
-      for (const planoId of planosIds) {
-        await mysqlPool.execute(
-          'INSERT INTO ferramenta_plano (ferramenta_id, plano_id) VALUES (?, ?)',
-          [ferramentaId, planoId]
-        );
-      }
-    }
-
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  // Operacao de escrita - usar painel admin
+  return {
+    success: false,
+    error: 'Para gerenciar planos das ferramentas, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // === ADMIN - ACESSOS PREMIUM ===
+// NOTA: Operacoes de escrita devem ser feitas pelo painel admin em filehub.space/admin
+
 ipcMain.handle('admin:getAcessosPremiumAll', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [acessos] = await mysqlPool.execute('SELECT * FROM acesso_premiums ORDER BY titulo');
+    api.setAuthToken(currentSessionToken);
+    const acessos = await api.getAcessosPremium();
     return { success: true, data: acessos };
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error('Erro ao buscar acessos premium:', error);
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -1672,58 +1344,33 @@ ipcMain.handle('admin:createAcessoPremium', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      'INSERT INTO acesso_premiums (titulo, descricao, capa, tipo_acesso, url, login, senha, chave_de_acesso, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [data.titulo, data.descricao || '', data.capa || '', data.tipo_acesso || 'login_senha', data.url || '', data.login || '', data.senha || '', data.chave_de_acesso || '', data.status || 'online']
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar acessos premium, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:updateAcessoPremium', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.titulo !== undefined) { updates.push('titulo = ?'); values.push(data.titulo); }
-    if (data.descricao !== undefined) { updates.push('descricao = ?'); values.push(data.descricao); }
-    if (data.capa !== undefined) { updates.push('capa = ?'); values.push(data.capa); }
-    if (data.tipo_acesso !== undefined) { updates.push('tipo_acesso = ?'); values.push(data.tipo_acesso); }
-    if (data.url !== undefined) { updates.push('url = ?'); values.push(data.url); }
-    if (data.login !== undefined) { updates.push('login = ?'); values.push(data.login); }
-    if (data.senha !== undefined) { updates.push('senha = ?'); values.push(data.senha); }
-    if (data.chave_de_acesso !== undefined) { updates.push('chave_de_acesso = ?'); values.push(data.chave_de_acesso); }
-    if (data.status !== undefined) { updates.push('status = ?'); values.push(data.status); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE acesso_premiums SET ${updates.join(', ')} WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar acessos premium, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:deleteAcessoPremium', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    // Remove permissoes de planos associadas
-    await mysqlPool.execute('DELETE FROM acesso_premium_plano WHERE acesso_premium_id = ?', [id]);
-    // Remove o acesso premium
-    await mysqlPool.execute('DELETE FROM acesso_premiums WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar acessos premium, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Buscar quais planos tem acesso a um acesso premium
@@ -1731,15 +1378,7 @@ ipcMain.handle('admin:getAcessoPremiumPlanos', async (event, acessoId) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [planos] = await mysqlPool.execute(
-      'SELECT plano_id FROM acesso_premium_plano WHERE acesso_premium_id = ?',
-      [acessoId]
-    );
-    return { success: true, data: planos.map(p => p.plano_id) };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return { success: true, data: [] };
 });
 
 // Atualizar quais planos tem acesso a um acesso premium
@@ -1747,37 +1386,27 @@ ipcMain.handle('admin:updateAcessoPremiumPlanos', async (event, acessoId, planos
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    // Remove todas as permissoes atuais
-    await mysqlPool.execute('DELETE FROM acesso_premium_plano WHERE acesso_premium_id = ?', [acessoId]);
-
-    // Insere as novas permissoes
-    if (planosIds && planosIds.length > 0) {
-      const values = planosIds.map(planoId => [acessoId, planoId]);
-      for (const [acessoPremiumId, planoId] of values) {
-        await mysqlPool.execute(
-          'INSERT INTO acesso_premium_plano (acesso_premium_id, plano_id) VALUES (?, ?)',
-          [acessoPremiumId, planoId]
-        );
-      }
-    }
-
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para gerenciar planos dos acessos, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // === ADMIN - CANVA CATEGORIAS ===
+// NOTA: Operacoes de escrita devem ser feitas pelo painel admin em filehub.space/admin
+
 ipcMain.handle('admin:getCanvaCategoriasAll', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [categorias] = await mysqlPool.execute('SELECT * FROM canva_categorias ORDER BY ordem, nome');
+    api.setAuthToken(currentSessionToken);
+    const categorias = await api.getCanvaCategorias();
     return { success: true, data: categorias };
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error('Erro ao buscar categorias Canva:', error);
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -1785,67 +1414,49 @@ ipcMain.handle('admin:createCanvaCategoria', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      'INSERT INTO canva_categorias (nome, descricao, ordem, status) VALUES (?, ?, ?, ?)',
-      [data.nome, data.descricao || '', data.ordem || 0, data.status !== undefined ? data.status : 1]
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar categorias Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:updateCanvaCategoria', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.nome !== undefined) { updates.push('nome = ?'); values.push(data.nome); }
-    if (data.descricao !== undefined) { updates.push('descricao = ?'); values.push(data.descricao); }
-    if (data.ordem !== undefined) { updates.push('ordem = ?'); values.push(data.ordem); }
-    if (data.status !== undefined) { updates.push('status = ?'); values.push(data.status); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE canva_categorias SET ${updates.join(', ')} WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar categorias Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:deleteCanvaCategoria', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    await mysqlPool.execute('DELETE FROM canva_categorias WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar categorias Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // === ADMIN - CANVA ARQUIVOS ===
+// NOTA: Operacoes de escrita devem ser feitas pelo painel admin em filehub.space/admin
+
 ipcMain.handle('admin:getCanvaArquivosAll', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [arquivos] = await mysqlPool.execute(`
-      SELECT ca.*, cc.nome as categoria_nome
-      FROM canva_arquivos ca
-      LEFT JOIN canva_categorias cc ON ca.categoria_id = cc.id
-      ORDER BY ca.nome
-    `);
+    api.setAuthToken(currentSessionToken);
+    const arquivos = await api.getCanvaArquivos();
     return { success: true, data: arquivos };
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error('Erro ao buscar arquivos Canva:', error);
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -1853,64 +1464,49 @@ ipcMain.handle('admin:createCanvaArquivo', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      'INSERT INTO canva_arquivos (nome, legenda_sugerida, categoria_id, capa, download, status) VALUES (?, ?, ?, ?, ?, ?)',
-      [data.nome, data.legenda_sugerida || '', data.categoria_id || null, data.capa || '', data.download || '', data.status !== undefined ? data.status : 1]
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar arquivos Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:updateCanvaArquivo', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.nome !== undefined) { updates.push('nome = ?'); values.push(data.nome); }
-    if (data.legenda_sugerida !== undefined) { updates.push('legenda_sugerida = ?'); values.push(data.legenda_sugerida); }
-    if (data.categoria_id !== undefined) { updates.push('categoria_id = ?'); values.push(data.categoria_id); }
-    if (data.capa !== undefined) { updates.push('capa = ?'); values.push(data.capa); }
-    if (data.download !== undefined) { updates.push('download = ?'); values.push(data.download); }
-    if (data.status !== undefined) { updates.push('status = ?'); values.push(data.status); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE canva_arquivos SET ${updates.join(', ')} WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar arquivos Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:deleteCanvaArquivo', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    await mysqlPool.execute('DELETE FROM canva_arquivos WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar arquivos Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // === ADMIN - TOOLS ===
+// NOTA: Operacoes de escrita devem ser feitas pelo painel admin em filehub.space/admin
+
 ipcMain.handle('admin:getToolsAll', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [tools] = await mysqlPool.execute('SELECT * FROM tools ORDER BY ordem, label');
+    api.setAuthToken(currentSessionToken);
+    const tools = await api.getTools();
     return { success: true, data: tools };
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error('Erro ao buscar tools:', error);
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -1918,67 +1514,49 @@ ipcMain.handle('admin:createTool', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      'INSERT INTO tools (parent_id, label, icon, url, ordem, show_app, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [data.parent_id || null, data.label, data.icon || '', data.url || '', data.ordem || 0, data.show_app !== undefined ? data.show_app : 1, data.is_active !== undefined ? data.is_active : 1]
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar tools, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:updateTool', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.parent_id !== undefined) { updates.push('parent_id = ?'); values.push(data.parent_id); }
-    if (data.label !== undefined) { updates.push('label = ?'); values.push(data.label); }
-    if (data.icon !== undefined) { updates.push('icon = ?'); values.push(data.icon); }
-    if (data.url !== undefined) { updates.push('url = ?'); values.push(data.url); }
-    if (data.ordem !== undefined) { updates.push('ordem = ?'); values.push(data.ordem); }
-    if (data.show_app !== undefined) { updates.push('show_app = ?'); values.push(data.show_app); }
-    if (data.is_active !== undefined) { updates.push('is_active = ?'); values.push(data.is_active); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE tools SET ${updates.join(', ')} WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar tools, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:deleteTool', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    // Remove filhos primeiro
-    await mysqlPool.execute('UPDATE tools SET parent_id = NULL WHERE parent_id = ?', [id]);
-    await mysqlPool.execute('DELETE FROM tools WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar tools, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // === ADMIN - CANVA ACESSOS ===
+// NOTA: Operacoes de escrita devem ser feitas pelo painel admin em filehub.space/admin
+
 ipcMain.handle('admin:getCanvaAcessosAll', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [acessos] = await mysqlPool.execute('SELECT * FROM canva_acessos ORDER BY titulo');
+    api.setAuthToken(currentSessionToken);
+    const acessos = await api.getCanvaAcessos();
     return { success: true, data: acessos };
   } catch (error) {
-    return { success: false, error: error.message };
+    console.error('Erro ao buscar acessos Canva:', error);
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -1986,54 +1564,33 @@ ipcMain.handle('admin:createCanvaAcesso', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      'INSERT INTO canva_acessos (titulo, descricao, url, capa, status) VALUES (?, ?, ?, ?, ?)',
-      [data.titulo, data.descricao || '', data.url, data.capa || '', data.status !== undefined ? data.status : 1]
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar acessos Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:updateCanvaAcesso', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.titulo !== undefined) { updates.push('titulo = ?'); values.push(data.titulo); }
-    if (data.descricao !== undefined) { updates.push('descricao = ?'); values.push(data.descricao); }
-    if (data.url !== undefined) { updates.push('url = ?'); values.push(data.url); }
-    if (data.capa !== undefined) { updates.push('capa = ?'); values.push(data.capa); }
-    if (data.status !== undefined) { updates.push('status = ?'); values.push(data.status); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE canva_acessos SET ${updates.join(', ')} WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar acessos Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 ipcMain.handle('admin:deleteCanvaAcesso', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    // Remove permissoes de planos associadas
-    await mysqlPool.execute('DELETE FROM canva_acesso_plano WHERE canva_acesso_id = ?', [id]);
-    // Remove o acesso canva
-    await mysqlPool.execute('DELETE FROM canva_acessos WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar acessos Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Buscar quais planos tem acesso a um acesso canva
@@ -2041,15 +1598,7 @@ ipcMain.handle('admin:getCanvaAcessoPlanos', async (event, canvaAcessoId) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [planos] = await mysqlPool.execute(
-      'SELECT plano_id FROM canva_acesso_plano WHERE canva_acesso_id = ?',
-      [canvaAcessoId]
-    );
-    return { success: true, data: planos.map(p => p.plano_id) };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return { success: true, data: [] };
 });
 
 // Atualizar quais planos tem acesso a um acesso canva
@@ -2057,24 +1606,11 @@ ipcMain.handle('admin:updateCanvaAcessoPlanos', async (event, canvaAcessoId, pla
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    // Remove todas as permissoes atuais
-    await mysqlPool.execute('DELETE FROM canva_acesso_plano WHERE canva_acesso_id = ?', [canvaAcessoId]);
-
-    // Insere as novas permissoes
-    if (planosIds && planosIds.length > 0) {
-      for (const planoId of planosIds) {
-        await mysqlPool.execute(
-          'INSERT INTO canva_acesso_plano (canva_acesso_id, plano_id) VALUES (?, ?)',
-          [canvaAcessoId, planoId]
-        );
-      }
-    }
-
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para gerenciar planos dos acessos Canva, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // === ADMIN - PLANOS (para dropdown) ===
@@ -2083,10 +1619,12 @@ ipcMain.handle('admin:getPlanos', async () => {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [planos] = await mysqlPool.execute('SELECT * FROM planos ORDER BY nome');
+    api.setAuthToken(currentSessionToken);
+    const planos = await api.getPlanos();
     return { success: true, data: planos };
   } catch (error) {
-    // Se a tabela nao existir, retorna os planos padrao
+    console.error('Erro ao buscar planos:', error);
+    // Se falhar, retorna os planos padrao
     return { success: true, data: Object.entries(PLANO_NAMES).map(([id, nome]) => ({ id: parseInt(id), nome })) };
   }
 });
@@ -2098,40 +1636,9 @@ ipcMain.handle('profile:update', async (event, data) => {
       return { success: false, error: 'Usuario nao autenticado' };
     }
 
-    const updates = [];
-    const values = [];
-
-    if (data.avatar !== undefined) {
-      updates.push('avatar = ?');
-      values.push(data.avatar);
-    }
-
-    if (data.whatsapp !== undefined) {
-      updates.push('whatsapp = ?');
-      values.push(data.whatsapp);
-    }
-
-    if (data.pin !== undefined) {
-      updates.push('security_pin = ?');
-      values.push(data.pin);
-    }
-
-    if (data.password) {
-      const hashedPassword = await bcrypt.hash(data.password, 10);
-      updates.push('password = ?');
-      values.push(hashedPassword);
-    }
-
-    if (updates.length === 0) {
-      return { success: true };
-    }
-
-    values.push(currentUser.id);
-
-    await mysqlPool.execute(
-      `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
-      values
-    );
+    // Usa a API para atualizar perfil
+    api.setAuthToken(currentSessionToken);
+    await api.updateProfile(data);
 
     // Atualiza o usuario local
     if (data.avatar !== undefined) currentUser.avatar = data.avatar;
@@ -2142,7 +1649,7 @@ ipcMain.handle('profile:update', async (event, data) => {
     return { success: true };
   } catch (error) {
     console.error('Erro ao atualizar perfil:', error);
-    return { success: false, error: 'Erro ao atualizar perfil' };
+    return { success: false, error: error.message || 'Erro ao atualizar perfil' };
   }
 });
 
@@ -2380,32 +1887,30 @@ function createMenu() {
 // PLANOS PLATAFORMA
 // =============================================
 
-// Buscar planos da plataforma (para usuarios)
+// Buscar planos da plataforma (para usuarios) - via API
 ipcMain.handle('planos:getAll', async () => {
   try {
-    const [planos] = await mysqlPool.execute(
-      'SELECT * FROM planos_plataforma WHERE status = 1 ORDER BY ordem ASC'
-    );
+    api.setAuthToken(currentSessionToken);
+    const planos = await api.getPlanosPlataforma();
     return { success: true, data: planos };
   } catch (error) {
     console.error('Erro ao buscar planos:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
-// Admin - Buscar todos os planos
+// Admin - Buscar todos os planos - via API
 ipcMain.handle('admin:getPlanosPlataforma', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [planos] = await mysqlPool.execute(
-      'SELECT * FROM planos_plataforma ORDER BY ordem ASC'
-    );
+    api.setAuthToken(currentSessionToken);
+    const planos = await api.getPlanosPlataforma();
     return { success: true, data: planos };
   } catch (error) {
     console.error('Erro ao buscar planos:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -2414,29 +1919,11 @@ ipcMain.handle('admin:createPlanoPlataforma', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      `INSERT INTO planos_plataforma (nome, descricao, valor, valor_original, recursos, cor_destaque, icone, is_popular, ordem, link_pagamento, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        data.nome,
-        data.descricao || null,
-        data.valor,
-        data.valor_original || null,
-        data.recursos || null,
-        data.cor_destaque || '#157f67',
-        data.icone || 'star',
-        data.is_popular || 0,
-        data.ordem || 0,
-        data.link_pagamento || null,
-        data.status !== undefined ? data.status : 1
-      ]
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    console.error('Erro ao criar plano:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar planos, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Atualizar plano
@@ -2444,31 +1931,11 @@ ipcMain.handle('admin:updatePlanoPlataforma', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.nome !== undefined) { updates.push('nome = ?'); values.push(data.nome); }
-    if (data.descricao !== undefined) { updates.push('descricao = ?'); values.push(data.descricao); }
-    if (data.valor !== undefined) { updates.push('valor = ?'); values.push(data.valor); }
-    if (data.valor_original !== undefined) { updates.push('valor_original = ?'); values.push(data.valor_original); }
-    if (data.recursos !== undefined) { updates.push('recursos = ?'); values.push(data.recursos); }
-    if (data.cor_destaque !== undefined) { updates.push('cor_destaque = ?'); values.push(data.cor_destaque); }
-    if (data.icone !== undefined) { updates.push('icone = ?'); values.push(data.icone); }
-    if (data.is_popular !== undefined) { updates.push('is_popular = ?'); values.push(data.is_popular); }
-    if (data.ordem !== undefined) { updates.push('ordem = ?'); values.push(data.ordem); }
-    if (data.link_pagamento !== undefined) { updates.push('link_pagamento = ?'); values.push(data.link_pagamento); }
-    if (data.status !== undefined) { updates.push('status = ?'); values.push(data.status); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE planos_plataforma SET ${updates.join(', ')} WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao atualizar plano:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar planos, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Deletar plano
@@ -2476,45 +1943,41 @@ ipcMain.handle('admin:deletePlanoPlataforma', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    await mysqlPool.execute('DELETE FROM planos_plataforma WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao deletar plano:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar planos, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // =============================================
 // PLANOS DETALHES (Comparativo)
 // =============================================
 
-// Buscar detalhes dos planos (para usuarios - modal comparativo)
+// Buscar detalhes dos planos (para usuarios - modal comparativo) - via API
 ipcMain.handle('planosDetalhes:getAll', async () => {
   try {
-    const [detalhes] = await mysqlPool.execute(
-      'SELECT * FROM planos_detalhes WHERE status = 1 ORDER BY categoria, ordem ASC'
-    );
+    api.setAuthToken(currentSessionToken);
+    const detalhes = await api.getPlanosDetalhes();
     return { success: true, data: detalhes };
   } catch (error) {
     console.error('Erro ao buscar detalhes dos planos:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
-// Admin - Buscar todos os detalhes
+// Admin - Buscar todos os detalhes - via API
 ipcMain.handle('admin:getPlanosDetalhes', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [detalhes] = await mysqlPool.execute(
-      'SELECT * FROM planos_detalhes ORDER BY categoria, ordem ASC'
-    );
+    api.setAuthToken(currentSessionToken);
+    const detalhes = await api.getPlanosDetalhes();
     return { success: true, data: detalhes };
   } catch (error) {
     console.error('Erro ao buscar detalhes:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -2523,27 +1986,11 @@ ipcMain.handle('admin:createPlanoDetalhe', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      `INSERT INTO planos_detalhes (categoria, nome_recurso, icone, plano_1, plano_2, plano_3, plano_4, ordem, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        data.categoria,
-        data.nome_recurso,
-        data.icone || '',
-        data.plano_1 || '❌',
-        data.plano_2 || '❌',
-        data.plano_3 || '❌',
-        data.plano_4 || '❌',
-        data.ordem || 0,
-        data.status !== undefined ? data.status : 1
-      ]
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    console.error('Erro ao criar detalhe:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar detalhes de planos, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Atualizar detalhe
@@ -2551,29 +1998,11 @@ ipcMain.handle('admin:updatePlanoDetalhe', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.categoria !== undefined) { updates.push('categoria = ?'); values.push(data.categoria); }
-    if (data.nome_recurso !== undefined) { updates.push('nome_recurso = ?'); values.push(data.nome_recurso); }
-    if (data.icone !== undefined) { updates.push('icone = ?'); values.push(data.icone); }
-    if (data.plano_1 !== undefined) { updates.push('plano_1 = ?'); values.push(data.plano_1); }
-    if (data.plano_2 !== undefined) { updates.push('plano_2 = ?'); values.push(data.plano_2); }
-    if (data.plano_3 !== undefined) { updates.push('plano_3 = ?'); values.push(data.plano_3); }
-    if (data.plano_4 !== undefined) { updates.push('plano_4 = ?'); values.push(data.plano_4); }
-    if (data.ordem !== undefined) { updates.push('ordem = ?'); values.push(data.ordem); }
-    if (data.status !== undefined) { updates.push('status = ?'); values.push(data.status); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE planos_detalhes SET ${updates.join(', ')} WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao atualizar detalhe:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar detalhes de planos, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Deletar detalhe
@@ -2581,31 +2010,26 @@ ipcMain.handle('admin:deletePlanoDetalhe', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    await mysqlPool.execute('DELETE FROM planos_detalhes WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao deletar detalhe:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar detalhes de planos, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // =============================================
 // REPORTS
 // =============================================
 
-// Usuario criar report
+// Usuario criar report - via API
 ipcMain.handle('reports:create', async (event, data) => {
   if (!currentUser) {
     return { success: false, error: 'Usuario nao autenticado' };
   }
   try {
-    const [result] = await mysqlPool.execute(
-      `INSERT INTO reports (ferramenta_id, tipo_report, user_id, motivo, status, created_at)
-       VALUES (?, ?, ?, ?, 'pendente', NOW())`,
-      [data.ferramenta_id, data.tipo_report || 'ferramenta', currentUser.id, data.motivo]
-    );
-    return { success: true, id: result.insertId };
+    api.setAuthToken(currentSessionToken);
+    const result = await api.createReport(data.ferramenta_id, data.tipo_report || 'ferramenta', data.motivo);
+    return { success: true, id: result.id };
   } catch (error) {
     console.error('Erro ao criar report:', error);
     return { success: false, error: error.message };
@@ -2617,31 +2041,8 @@ ipcMain.handle('admin:getReports', async (event, filtros) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    let query = `
-      SELECT r.*,
-             f.titulo as ferramenta_titulo,
-             u.name as usuario_nome,
-             u.email as usuario_email
-      FROM reports r
-      LEFT JOIN ferramentas f ON r.ferramenta_id = f.id
-      LEFT JOIN users u ON r.user_id = u.id
-    `;
-    const params = [];
-
-    if (filtros?.status) {
-      query += ' WHERE r.status = ?';
-      params.push(filtros.status);
-    }
-
-    query += ' ORDER BY r.created_at DESC';
-
-    const [reports] = await mysqlPool.execute(query, params);
-    return { success: true, data: reports };
-  } catch (error) {
-    console.error('Erro ao buscar reports:', error);
-    return { success: false, error: error.message };
-  }
+  // Reports devem ser gerenciados pelo painel admin
+  return { success: false, error: 'Para gerenciar reports, use o painel admin em filehub.space/admin', useAdminPanel: true, data: [] };
 });
 
 // Admin - Buscar report por ID
@@ -2649,23 +2050,7 @@ ipcMain.handle('admin:getReportById', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [reports] = await mysqlPool.execute(
-      `SELECT r.*,
-              f.titulo as ferramenta_titulo,
-              u.name as usuario_nome,
-              u.email as usuario_email
-       FROM reports r
-       LEFT JOIN ferramentas f ON r.ferramenta_id = f.id
-       LEFT JOIN users u ON r.user_id = u.id
-       WHERE r.id = ?`,
-      [id]
-    );
-    return { success: true, data: reports[0] || null };
-  } catch (error) {
-    console.error('Erro ao buscar report:', error);
-    return { success: false, error: error.message };
-  }
+  return { success: false, error: 'Para ver reports, use o painel admin em filehub.space/admin', useAdminPanel: true };
 });
 
 // Admin - Atualizar status do report e da ferramenta
@@ -2673,71 +2058,34 @@ ipcMain.handle('admin:updateReportStatus', async (event, reportId, newStatus) =>
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    // Busca o report para pegar o ferramenta_id
-    const [reports] = await mysqlPool.execute(
-      'SELECT ferramenta_id FROM reports WHERE id = ?',
-      [reportId]
-    );
-
-    if (reports.length === 0) {
-      return { success: false, error: 'Report nao encontrado' };
-    }
-
-    const ferramentaId = reports[0].ferramenta_id;
-
-    // Atualiza o status do report
-    const readAt = newStatus === 'resolvido' ? 'NOW()' : 'NULL';
-    await mysqlPool.execute(
-      `UPDATE reports SET status = ?, read_at = ${newStatus === 'resolvido' ? 'NOW()' : 'NULL'} WHERE id = ?`,
-      [newStatus, reportId]
-    );
-
-    // Atualiza o status da ferramenta baseado no status do report
-    if (ferramentaId) {
-      let ferramentaStatus = 'online'; // resolvido = online
-      if (newStatus === 'pendente') {
-        ferramentaStatus = 'offline';
-      } else if (newStatus === 'em_andamento') {
-        ferramentaStatus = 'manutencao';
-      }
-
-      await mysqlPool.execute(
-        'UPDATE ferramentas SET status = ? WHERE id = ?',
-        [ferramentaStatus, ferramentaId]
-      );
-    }
-
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao atualizar status do report:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para gerenciar reports, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // =============================================
 // DASHBOARD - BANNERS E COVERS
 // =============================================
 
-// Buscar banners ativos
+// Buscar banners ativos (via API)
 ipcMain.handle('dashboard:getBanners', async () => {
   try {
-    const [banners] = await mysqlPool.execute(
-      'SELECT * FROM dashboard_banners WHERE is_active = 1 ORDER BY `order` ASC'
-    );
+    api.setAuthToken(currentSessionToken);
+    const banners = await api.getDashboardBanners();
     return { success: true, data: banners };
   } catch (error) {
     console.error('Erro ao buscar banners:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
-// Buscar covers ativos
+// Buscar covers ativos (via API)
 ipcMain.handle('dashboard:getCovers', async () => {
   try {
-    const [covers] = await mysqlPool.execute(
-      'SELECT * FROM dashboard_covers WHERE is_active = 1 ORDER BY `order` ASC'
-    );
+    api.setAuthToken(currentSessionToken);
+    const covers = await api.getDashboardCovers();
     return { success: true, data: covers };
   } catch (error) {
     console.error('Erro ao buscar covers:', error);
@@ -2745,17 +2093,18 @@ ipcMain.handle('dashboard:getCovers', async () => {
   }
 });
 
-// Admin - Buscar todos os banners
+// Admin - Buscar todos os banners (via API)
 ipcMain.handle('admin:getBanners', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [banners] = await mysqlPool.execute('SELECT * FROM dashboard_banners ORDER BY `order` ASC');
+    api.setAuthToken(currentSessionToken);
+    const banners = await api.getDashboardBanners();
     return { success: true, data: banners };
   } catch (error) {
     console.error('Erro ao buscar banners:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -2764,16 +2113,11 @@ ipcMain.handle('admin:createBanner', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      'INSERT INTO dashboard_banners (image, url, is_active, `order`, created_at) VALUES (?, ?, ?, ?, NOW())',
-      [data.image, data.url || null, data.is_active || 1, data.order || 0]
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    console.error('Erro ao criar banner:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar banners, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Atualizar banner
@@ -2781,24 +2125,11 @@ ipcMain.handle('admin:updateBanner', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.image !== undefined) { updates.push('image = ?'); values.push(data.image); }
-    if (data.url !== undefined) { updates.push('url = ?'); values.push(data.url); }
-    if (data.is_active !== undefined) { updates.push('is_active = ?'); values.push(data.is_active); }
-    if (data.order !== undefined) { updates.push('`order` = ?'); values.push(data.order); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE dashboard_banners SET ${updates.join(', ')}, updated_at = NOW() WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao atualizar banner:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar banners, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Deletar banner
@@ -2806,26 +2137,25 @@ ipcMain.handle('admin:deleteBanner', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    await mysqlPool.execute('DELETE FROM dashboard_banners WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao deletar banner:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar banners, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
-// Admin - Buscar todos os covers
+// Admin - Buscar todos os covers (via API)
 ipcMain.handle('admin:getCovers', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [covers] = await mysqlPool.execute('SELECT * FROM dashboard_covers ORDER BY `order` ASC');
+    api.setAuthToken(currentSessionToken);
+    const covers = await api.getDashboardCovers();
     return { success: true, data: covers };
   } catch (error) {
     console.error('Erro ao buscar covers:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -2834,16 +2164,11 @@ ipcMain.handle('admin:createCover', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      'INSERT INTO dashboard_covers (image, title, url, `order`, is_active, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-      [data.image, data.title || null, data.url || null, data.order || 0, data.is_active || 1]
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    console.error('Erro ao criar cover:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar covers, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Atualizar cover
@@ -2851,25 +2176,11 @@ ipcMain.handle('admin:updateCover', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.image !== undefined) { updates.push('image = ?'); values.push(data.image); }
-    if (data.title !== undefined) { updates.push('title = ?'); values.push(data.title); }
-    if (data.url !== undefined) { updates.push('url = ?'); values.push(data.url); }
-    if (data.order !== undefined) { updates.push('`order` = ?'); values.push(data.order); }
-    if (data.is_active !== undefined) { updates.push('is_active = ?'); values.push(data.is_active); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE dashboard_covers SET ${updates.join(', ')}, updated_at = NOW() WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao atualizar cover:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar covers, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Deletar cover
@@ -2877,56 +2188,55 @@ ipcMain.handle('admin:deleteCover', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    await mysqlPool.execute('DELETE FROM dashboard_covers WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao deletar cover:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar covers, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // =============================================
 // MENU - GERENCIAMENTO
 // =============================================
 
-// Buscar itens do menu ativos (para exibicao)
+// Buscar itens do menu ativos (para exibicao) - via API
 ipcMain.handle('menu:getItems', async () => {
   try {
-    const [items] = await mysqlPool.execute(
-      'SELECT * FROM menu_items WHERE is_active = 1 ORDER BY `order` ASC'
-    );
-    return { success: true, data: items };
+    api.setAuthToken(currentSessionToken);
+    const items = await api.getMenuItems();
+    // Filtra apenas os ativos
+    const activeItems = items.filter(item => item.is_active === 1);
+    return { success: true, data: activeItems };
   } catch (error) {
     console.error('Erro ao buscar menu:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
-// Buscar TODOS os itens do menu (para verificar paginas ativas/inativas)
+// Buscar TODOS os itens do menu (para verificar paginas ativas/inativas) - via API
 ipcMain.handle('menu:getAllItems', async () => {
   try {
-    const [items] = await mysqlPool.execute(
-      'SELECT * FROM menu_items ORDER BY `order` ASC'
-    );
+    api.setAuthToken(currentSessionToken);
+    const items = await api.getMenuItems();
     return { success: true, data: items };
   } catch (error) {
     console.error('Erro ao buscar todos os itens do menu:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
-// Admin - Buscar todos os itens do menu
+// Admin - Buscar todos os itens do menu (via API)
 ipcMain.handle('admin:getMenuItems', async () => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
   try {
-    const [items] = await mysqlPool.execute('SELECT * FROM menu_items ORDER BY `order` ASC');
+    api.setAuthToken(currentSessionToken);
+    const items = await api.getMenuItems();
     return { success: true, data: items };
   } catch (error) {
     console.error('Erro ao buscar menu:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error.message, data: [] };
   }
 });
 
@@ -2935,16 +2245,11 @@ ipcMain.handle('admin:createMenuItem', async (event, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const [result] = await mysqlPool.execute(
-      'INSERT INTO menu_items (label, icon, page, `order`, is_active, parent_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-      [data.label, data.icon || null, data.page, data.order || 0, data.is_active || 1, data.parent_id || null]
-    );
-    return { success: true, id: result.insertId };
-  } catch (error) {
-    console.error('Erro ao criar menu item:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para criar itens do menu, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Atualizar item do menu
@@ -2952,26 +2257,11 @@ ipcMain.handle('admin:updateMenuItem', async (event, id, data) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    const updates = [];
-    const values = [];
-
-    if (data.label !== undefined) { updates.push('label = ?'); values.push(data.label); }
-    if (data.icon !== undefined) { updates.push('icon = ?'); values.push(data.icon); }
-    if (data.page !== undefined) { updates.push('page = ?'); values.push(data.page); }
-    if (data.order !== undefined) { updates.push('`order` = ?'); values.push(data.order); }
-    if (data.is_active !== undefined) { updates.push('is_active = ?'); values.push(data.is_active); }
-    if (data.parent_id !== undefined) { updates.push('parent_id = ?'); values.push(data.parent_id); }
-
-    if (updates.length === 0) return { success: true };
-
-    values.push(id);
-    await mysqlPool.execute(`UPDATE menu_items SET ${updates.join(', ')}, updated_at = NOW() WHERE id = ?`, values);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao atualizar menu item:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para editar itens do menu, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // Admin - Deletar item do menu
@@ -2979,80 +2269,24 @@ ipcMain.handle('admin:deleteMenuItem', async (event, id) => {
   if (!isCurrentUserAdmin()) {
     return { success: false, error: 'Acesso negado' };
   }
-  try {
-    await mysqlPool.execute('DELETE FROM menu_items WHERE id = ?', [id]);
-    return { success: true };
-  } catch (error) {
-    console.error('Erro ao deletar menu item:', error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: 'Para deletar itens do menu, use o painel admin em filehub.space/admin',
+    useAdminPanel: true
+  };
 });
 
 // =============================================
-// INICIALIZACAO DE MENU ITEMS PADRAO
+// INICIALIZACAO (MySQL removido - menu vem da API)
 // =============================================
-
-async function initDefaultMenuItems() {
-  if (!mysqlPool) return;
-
-  try {
-    // Cria tabela se nao existir
-    await mysqlPool.execute(`
-      CREATE TABLE IF NOT EXISTS menu_items (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        label VARCHAR(100) NOT NULL,
-        icon VARCHAR(50),
-        page VARCHAR(50),
-        \`order\` INT DEFAULT 0,
-        is_active TINYINT DEFAULT 1,
-        parent_id INT DEFAULT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-
-    // Verifica se ja existem itens no menu
-    const [existing] = await mysqlPool.execute('SELECT COUNT(*) as count FROM menu_items');
-    if (existing[0].count > 0) {
-      console.log('Menu items ja existem:', existing[0].count);
-      return;
-    }
-
-    console.log('Inicializando menu_items padrao...');
-
-    // Itens padrao do menu (Dashboard desativado por padrao)
-    const defaultItems = [
-      { label: 'Dashboard', icon: '&#127968;', page: 'dashboard', order: 1, is_active: 0 },
-      { label: 'Inteligencia Artificial', icon: '&#129302;', page: 'ferramentas', order: 2, is_active: 1 },
-      { label: 'Acessos Premium', icon: '&#11088;', page: 'acessos', order: 5, is_active: 1 },
-      { label: 'Materiais', icon: '&#128218;', page: 'materiais', order: 6, is_active: 1 },
-      { label: 'Meu Perfil', icon: '&#128100;', page: 'perfil', order: 7, is_active: 1 },
-      { label: 'Planos', icon: '&#128179;', page: 'planos', order: 8, is_active: 1 },
-      { label: 'Arquivos Canva', icon: '&#128196;', page: 'canva-arquivos', order: 3, is_active: 1 },
-      { label: 'Acesso Canva', icon: '&#128279;', page: 'canva-acesso', order: 4, is_active: 1 },
-    ];
-
-    for (const item of defaultItems) {
-      await mysqlPool.execute(
-        'INSERT INTO menu_items (label, icon, page, `order`, is_active, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-        [item.label, item.icon, item.page, item.order, item.is_active]
-      );
-      console.log(`Menu item criado: ${item.label} (ativo: ${item.is_active})`);
-    }
-
-    console.log('Menu items inicializados com sucesso!');
-  } catch (error) {
-    console.error('Erro ao inicializar menu items:', error);
-  }
-}
 
 // =============================================
 // APP LIFECYCLE
 // =============================================
 
 app.whenReady().then(async () => {
-  await initMySQL();
-  await initDefaultMenuItems(); // Inicializa menu items padrao
+  // MySQL removido por seguranca - usando apenas API
+  // await initDefaultMenuItems(); // Desativado - menu vem da API
   initDatabase();
   createWindow();
   createMenu();

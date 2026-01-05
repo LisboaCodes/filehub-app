@@ -32,6 +32,9 @@ contextBridge.exposeInMainWorld('api', {
   // Open session window
   openSession: (session) => ipcRenderer.invoke('session:open', session),
 
+  // Open external URL in default browser
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+
   // Decrypt Session Share data
   decryptSessionShare: (data, password) => ipcRenderer.invoke('crypto:decrypt', data, password),
 
