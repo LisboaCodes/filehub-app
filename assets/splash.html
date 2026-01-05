@@ -210,6 +210,35 @@
       50% { opacity: 1; }
     }
 
+    .progress-bar-container {
+      width: 100%;
+      max-width: 280px;
+      margin: 12px auto 0;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      overflow: hidden;
+      height: 8px;
+      position: relative;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--emerald), var(--emerald2));
+      border-radius: 10px;
+      transition: width 0.3s ease;
+      box-shadow: 0 0 10px rgba(16,185,129,0.5);
+    }
+    .progress-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 9px;
+      color: white;
+      font-weight: 600;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
     .progress-dots {
       display: flex;
       justify-content: center;
@@ -322,8 +351,12 @@
         <div class="spinner-ring"></div>
       </div>
 
-      <div class="loading-text">Iniciando FileHub</div>
-      <div class="status-text">Preparando ambiente seguro...</div>
+      <div class="loading-text" id="loadingText">Iniciando FileHub</div>
+      <div class="status-text" id="statusText">Preparando ambiente seguro...</div>
+      <div class="progress-bar-container" id="progressContainer" style="display: none;">
+        <div class="progress-bar" id="progressBar"></div>
+        <div class="progress-text" id="progressText">0%</div>
+      </div>
 
       <div class="progress-dots" aria-hidden="true">
         <div class="dot"></div>
@@ -334,7 +367,7 @@
     </div>
   </div>
 
-  <div class="version"><span class="pip"></span> v1.2.8</div>
+  <div class="version"><span class="pip"></span> v1.2.9</div>
 
   <script>
     // Partículas
@@ -434,12 +467,95 @@
 
     // Init
     createParticles();
-    setInterval(rotateStatusMessage, 3000);
 
-    setTimeout(() => {
-      mainText.textContent = '';
-      typeWriter();
-    }, 250);
+    // Elementos da UI
+    const loadingText = document.getElementById('loadingText');
+    const statusText = document.getElementById('statusText');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressTextEl = document.getElementById('progressText');
+
+    // Se tiver a API do splash (Electron com preload)
+    if (window.splashAPI) {
+      // Atualiza a versao
+      window.splashAPI.getAppVersion().then(version => {
+        const versionEl = document.querySelector('.version');
+        if (versionEl) {
+          versionEl.innerHTML = '<span class="pip"></span> v' + version;
+        }
+      });
+
+      // Recebe status do update
+      window.splashAPI.onUpdateStatus((status) => {
+        console.log('Status recebido:', status);
+
+        switch (status.type) {
+          case 'checking':
+            loadingText.textContent = 'Verificando atualizacoes...';
+            statusText.textContent = 'Conectando ao servidor...';
+            break;
+
+          case 'update-available':
+            loadingText.textContent = 'Atualizacao disponivel!';
+            statusText.textContent = 'Versao ' + status.version + ' - Baixando...';
+            progressContainer.style.display = 'block';
+            break;
+
+          case 'update-not-available':
+            loadingText.textContent = 'App atualizado!';
+            statusText.textContent = 'Carregando...';
+            break;
+
+          case 'downloading':
+            loadingText.textContent = 'Baixando atualizacao...';
+            statusText.textContent = 'Por favor, aguarde...';
+            progressContainer.style.display = 'block';
+            break;
+
+          case 'downloaded':
+            loadingText.textContent = 'Atualizacao baixada!';
+            statusText.textContent = 'Instalando em instantes...';
+            progressBar.style.width = '100%';
+            progressTextEl.textContent = '100%';
+            break;
+
+          case 'installing':
+            loadingText.textContent = 'Instalando atualizacao...';
+            statusText.textContent = 'O app sera reiniciado...';
+            break;
+
+          case 'error':
+            loadingText.textContent = 'Iniciando FileHub';
+            statusText.textContent = 'Carregando...';
+            progressContainer.style.display = 'none';
+            break;
+
+          case 'loading':
+            loadingText.textContent = 'Iniciando FileHub';
+            statusText.textContent = status.message || 'Carregando...';
+            break;
+        }
+      });
+
+      // Recebe progresso do download
+      window.splashAPI.onUpdateProgress((progress) => {
+        const percent = Math.round(progress.percent);
+        progressBar.style.width = percent + '%';
+        progressTextEl.textContent = percent + '%';
+
+        // Calcula velocidade
+        const speed = (progress.bytesPerSecond / 1024 / 1024).toFixed(1);
+        statusText.textContent = 'Baixando... ' + speed + ' MB/s';
+      });
+
+    } else {
+      // Fallback para quando nao tem preload (navegador normal)
+      setInterval(rotateStatusMessage, 3000);
+      setTimeout(() => {
+        mainText.textContent = '';
+        typeWriter();
+      }, 250);
+    }
   </script>
 </body>
 </html>

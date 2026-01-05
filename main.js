@@ -636,7 +636,15 @@ const sessionWindows = new Map();
 let mainWindow;
 let db;
 
+// Flag para controlar se ja foi para o login
+let hasNavigatedToLogin = false;
+
 function createWindow() {
+  // Preload do splash (simplificado, so para receber eventos de update)
+  const splashPreload = app.isPackaged
+    ? path.join(__dirname, 'preload-splash.js')
+    : path.join(__dirname, 'preload-splash.js');
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -645,7 +653,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: splashPreload
     },
     titleBarStyle: 'default',
     show: false
@@ -661,29 +669,97 @@ function createWindow() {
     mainWindow.maximize();
     mainWindow.show();
 
-    // Apos 2 segundos, vai para o login
-    setTimeout(async () => {
-      // Verifica se a API esta online
-      try {
-        const status = await api.checkApiStatus();
-        console.log('API Status:', status);
-        if (status.online) {
-          console.log('API online - usando API para requisicoes');
-        } else {
-          console.log('API offline - algumas funcionalidades podem nao funcionar');
-        }
-      } catch (e) {
-        console.log('Erro ao verificar API:', e.message);
-      }
-
-      // Carrega a tela de login
-      mainWindow.loadFile('src/login.html');
-    }, 2000);
+    // Se estiver em producao, verifica updates durante o splash
+    if (app.isPackaged) {
+      checkForUpdatesOnSplash();
+    } else {
+      // Em dev, vai direto para o login apos 2 segundos
+      console.log('Modo desenvolvimento - pulando verificacao de updates');
+      setTimeout(() => {
+        goToLoginFromSplash();
+      }, 2000);
+    }
   });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+// Verifica updates durante o splash screen
+async function checkForUpdatesOnSplash() {
+  console.log('Verificando atualizacoes durante o splash...');
+
+  // Envia status inicial
+  sendSplashStatus({ type: 'checking' });
+
+  // Verifica API em paralelo
+  try {
+    const status = await api.checkApiStatus();
+    console.log('API Status:', status);
+  } catch (e) {
+    console.log('Erro ao verificar API:', e.message);
+  }
+
+  // Timeout de seguranca - se demorar muito, vai para o login
+  const safetyTimeout = setTimeout(() => {
+    if (!hasNavigatedToLogin) {
+      console.log('Timeout de seguranca - indo para login');
+      sendSplashStatus({ type: 'error' });
+      goToLoginFromSplash();
+    }
+  }, 15000); // 15 segundos de timeout
+
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    console.log('Resultado da verificacao:', result?.updateInfo?.version || 'nenhuma atualizacao');
+
+    // Se nao tem update, vai para o login
+    if (!result || !result.updateInfo) {
+      clearTimeout(safetyTimeout);
+      sendSplashStatus({ type: 'update-not-available' });
+      setTimeout(() => goToLoginFromSplash(), 1500);
+    }
+    // Se tem update, o evento 'update-available' sera disparado e o download comeca automaticamente
+  } catch (error) {
+    console.log('Erro ao verificar updates:', error.message);
+    clearTimeout(safetyTimeout);
+    sendSplashStatus({ type: 'error' });
+    setTimeout(() => goToLoginFromSplash(), 1500);
+  }
+}
+
+// Envia status para o splash screen
+function sendSplashStatus(status) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('splash:status', status);
+  }
+}
+
+// Envia progresso para o splash screen
+function sendSplashProgress(progress) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('splash:progress', progress);
+  }
+}
+
+// Navega do splash para o login
+function goToLoginFromSplash() {
+  if (hasNavigatedToLogin) return;
+  hasNavigatedToLogin = true;
+
+  console.log('Navegando para tela de login...');
+
+  // Troca o preload para o principal antes de carregar o login
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    // Carrega o login com o preload principal
+    mainWindow.webContents.session.setPreloads([path.join(__dirname, 'preload.js')]);
+
+    // Pequeno delay para a transicao
+    setTimeout(() => {
+      mainWindow.loadFile('src/login.html');
+    }, 500);
+  }
 }
 
 // Navega para a tela principal apos login
@@ -1658,60 +1734,95 @@ ipcMain.handle('profile:update', async (event, data) => {
 // =============================================
 
 function setupAutoUpdater() {
-  // Verifica atualizacoes ao iniciar
-  autoUpdater.checkForUpdates().catch(err => {
-    console.log('Erro ao verificar atualizacoes:', err.message);
-  });
+  // NAO verifica automaticamente aqui - sera feito no splash
+  // autoUpdater.checkForUpdates() - removido
 
   // Atualizacao disponivel - inicia download automaticamente
   autoUpdater.on('update-available', (info) => {
     console.log('Atualizacao disponivel:', info.version);
-    // Notifica o renderer para mostrar overlay
+
+    // Envia para o splash
+    sendSplashStatus({ type: 'update-available', version: info.version });
+
+    // Tambem notifica o renderer (para quando ja passou do splash)
     mainWindow?.webContents.send('update:available', info);
   });
 
   // Nenhuma atualizacao disponivel
   autoUpdater.on('update-not-available', () => {
     console.log('App esta atualizado');
+
+    // Envia para o splash e vai para login
+    sendSplashStatus({ type: 'update-not-available' });
+
+    if (!hasNavigatedToLogin) {
+      setTimeout(() => goToLoginFromSplash(), 1500);
+    }
   });
 
   // Progresso do download
   autoUpdater.on('download-progress', (progress) => {
     console.log(`Download: ${Math.round(progress.percent)}%`);
+
+    // Envia para o splash
+    sendSplashProgress(progress);
+
+    // Tambem notifica o renderer
     mainWindow?.webContents.send('update:progress', progress);
   });
 
   // Download concluido - instala automaticamente
   autoUpdater.on('update-downloaded', (info) => {
     console.log('Atualizacao baixada:', info.version);
+
+    // Envia para o splash
+    sendSplashStatus({ type: 'downloaded', version: info.version });
+
+    // Tambem notifica o renderer
     mainWindow?.webContents.send('update:downloaded', info);
 
-    // Aguarda 3 segundos e instala automaticamente
+    // Aguarda 2 segundos e instala automaticamente
     setTimeout(() => {
       console.log('Iniciando instalacao da atualizacao...');
+      sendSplashStatus({ type: 'installing' });
 
-      // Força o fechamento de todas as janelas
-      const allWindows = BrowserWindow.getAllWindows();
-      allWindows.forEach(win => {
-        win.removeAllListeners('close');
-        win.close();
+      // Metodo mais seguro de instalar a atualizacao
+      setImmediate(() => {
+        try {
+          // Remove listeners de close de todas as janelas para evitar bloqueios
+          const allWindows = BrowserWindow.getAllWindows();
+          allWindows.forEach(win => {
+            win.removeAllListeners('close');
+            win.destroy();
+          });
+
+          // Usa quitAndInstall com parametros corretos
+          // isSilent = false (mostra instalador)
+          // isForceRunAfter = true (reinicia app apos instalacao)
+          autoUpdater.quitAndInstall(false, true);
+        } catch (err) {
+          console.error('Erro ao instalar update:', err);
+          // Fallback: forca saida do app
+          app.exit(0);
+        }
       });
-
-      // Força quit e install
-      autoUpdater.quitAndInstall(false, true);
-
-      // Fallback: força saida do app apos 1 segundo
-      setTimeout(() => {
-        console.log('Forcando saida do app...');
-        app.exit(0);
-      }, 1000);
-    }, 3000);
+    }, 2000);
   });
 
   // Erro no update
   autoUpdater.on('error', (err) => {
     console.error('Erro no auto-updater:', err.message);
+
+    // Envia para o splash
+    sendSplashStatus({ type: 'error', message: err.message });
+
+    // Tambem notifica o renderer
     mainWindow?.webContents.send('update:error', err.message);
+
+    // Se ainda esta no splash, vai para o login
+    if (!hasNavigatedToLogin) {
+      setTimeout(() => goToLoginFromSplash(), 1500);
+    }
   });
 }
 
@@ -2288,18 +2399,23 @@ app.whenReady().then(async () => {
   // MySQL removido por seguranca - usando apenas API
   // await initDefaultMenuItems(); // Desativado - menu vem da API
   initDatabase();
-  createWindow();
-  createMenu();
 
-  // Configura auto-updater (apenas em producao/empacotado)
+  // Configura auto-updater ANTES de criar a janela (para eventos funcionarem no splash)
   if (app.isPackaged) {
     setupAutoUpdater();
   } else {
     console.log('Skip checkForUpdates because application is not packed and dev update config is not forced');
   }
 
+  // Reseta flag de navegacao
+  hasNavigatedToLogin = false;
+
+  createWindow();
+  createMenu();
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
+      hasNavigatedToLogin = false;
       createWindow();
     }
   });
