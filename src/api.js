@@ -191,10 +191,17 @@ async function getDashboardBanners() {
 }
 
 /**
- * Lista covers do dashboard
+ * Lista covers do dashboard (site)
  */
 async function getDashboardCovers() {
   return await apiRequest('/dashboard/covers');
+}
+
+/**
+ * Lista capas do app (gerenciadas pelo admin)
+ */
+async function getAppCovers() {
+  return await apiRequest('/app-covers');
 }
 
 // =============================================
@@ -337,6 +344,7 @@ module.exports = {
   // Dashboard
   getDashboardBanners,
   getDashboardCovers,
+  getAppCovers,
 
   // Materiais
   getMateriais,

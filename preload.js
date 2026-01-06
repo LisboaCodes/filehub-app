@@ -161,6 +161,7 @@ contextBridge.exposeInMainWorld('api', {
   // Dashboard - Banners e Covers (usuario)
   getDashboardBanners: () => ipcRenderer.invoke('dashboard:getBanners'),
   getDashboardCovers: () => ipcRenderer.invoke('dashboard:getCovers'),
+  getAppCovers: () => ipcRenderer.invoke('dashboard:getAppCovers'),
 
   // Admin - Banners
   adminGetBanners: () => ipcRenderer.invoke('admin:getBanners'),
@@ -186,5 +187,21 @@ contextBridge.exposeInMainWorld('api', {
   adminGetMenuItems: () => ipcRenderer.invoke('admin:getMenuItems'),
   adminCreateMenuItem: (data) => ipcRenderer.invoke('admin:createMenuItem', data),
   adminUpdateMenuItem: (id, data) => ipcRenderer.invoke('admin:updateMenuItem', id, data),
-  adminDeleteMenuItem: (id) => ipcRenderer.invoke('admin:deleteMenuItem', id)
+  adminDeleteMenuItem: (id) => ipcRenderer.invoke('admin:deleteMenuItem', id),
+
+  // =============================================
+  // NAVEGACAO DO APP
+  // =============================================
+
+  // Abre URL dentro do app (para capas do dashboard)
+  openUrlInApp: (url) => ipcRenderer.invoke('app:openUrl', url),
+
+  // Volta para o dashboard
+  backToDashboard: () => ipcRenderer.invoke('app:backToDashboard'),
+
+  // Navega para pagina especifica do app
+  goToAppPage: (pageNumber) => ipcRenderer.invoke('app:goToPage', pageNumber),
+
+  // Retorna URL base do servidor
+  getServerUrl: () => ipcRenderer.invoke('app:getServerUrl')
 });

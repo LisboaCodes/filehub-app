@@ -2356,7 +2356,8 @@ async function loadDashboardCovers() {
   if (!container) return;
 
   try {
-    const result = await window.api.getDashboardCovers();
+    // Usa capas do app (gerenciadas em /admin/app-pages)
+    const result = await window.api.getAppCovers();
     if (result.success && result.data.length > 0) {
       dashboardCovers = result.data;
       renderDashboardCovers();
@@ -2374,10 +2375,11 @@ function renderDashboardCovers() {
   if (!container) return;
 
   container.innerHTML = dashboardCovers.map(cover => {
-    const imageUrl = cover.image.startsWith('http') ? cover.image : `https://filehub.space/storage/${cover.image}`;
+    // Usa 'capa' do app-pages (gerenciado em /admin/app-pages)
+    const imageUrl = cover.capa && cover.capa.startsWith('http') ? cover.capa : `https://filehub.space/storage/${cover.capa}`;
     return `
       <div class="cover-card" ${cover.url ? `data-url="${escapeHtml(cover.url)}"` : ''}>
-        <img src="${escapeHtml(imageUrl)}" alt="Cover" class="cover-img">
+        <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(cover.title || 'Cover')}" class="cover-img">
       </div>
     `;
   }).join('');
@@ -2387,7 +2389,8 @@ function renderDashboardCovers() {
     card.addEventListener('click', () => {
       const url = card.dataset.url;
       if (url) {
-        window.open(url, '_blank');
+        // Abre a URL dentro do app (nao no navegador)
+        window.api.openUrlInApp(url);
       }
     });
   });

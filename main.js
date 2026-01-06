@@ -8,9 +8,12 @@ const Database = require('./src/database'); // Database local
 const api = require('./src/api'); // API do FileHub
 
 // Configuracao do auto-updater
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
-autoUpdater.forceAppQuit = true;
+// No Mac sem assinatura, auto-download pode causar problemas com Gatekeeper
+// Entao desabilitamos e mostramos notificacao para download manual
+const isMac = process.platform === 'darwin';
+autoUpdater.autoDownload = !isMac; // Windows baixa automatico, Mac nao
+autoUpdater.autoInstallOnAppQuit = !isMac;
+autoUpdater.forceAppQuit = !isMac;
 
 // Usuario logado atualmente
 let currentUser = null;
@@ -770,6 +773,15 @@ function createWindow() {
     }
   });
 
+  // Intercepta navegacao para protocolo especial (voltar ao dashboard)
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('filehub://back-to-dashboard')) {
+      event.preventDefault();
+      console.log('Voltando ao dashboard...');
+      goToMainScreen();
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -851,11 +863,123 @@ function goToLoginFromSplash() {
   }
 }
 
-// Navega para a tela principal apos login
+// URL base do servidor para paginas do app
+const APP_SERVER_URL = 'https://filehub.space';
+
+// Navega para a tela principal apos login (dashboard local com menus)
 function goToMainScreen() {
   if (mainWindow) {
     mainWindow.loadFile('src/index.html');
   }
+}
+
+// Navega para uma pagina especifica do app (gerenciada pelo admin)
+function goToAppPage(pageNumber) {
+  if (mainWindow && currentSessionToken) {
+    const pageUrl = `${APP_SERVER_URL}/app/${pageNumber}.html?token=${encodeURIComponent(currentSessionToken)}`;
+    console.log('Carregando pagina do app:', pageUrl);
+    mainWindow.loadURL(pageUrl);
+  }
+}
+
+// Abre uma URL dentro do app (para capas/covers)
+function openUrlInApp(url) {
+  if (!mainWindow) return;
+
+  console.log('Abrindo URL no app:', url);
+
+  // Se for URL relativa, adiciona o servidor base
+  let finalUrl = url;
+  if (url.startsWith('/')) {
+    finalUrl = `${APP_SERVER_URL}${url}`;
+  }
+
+  // Se for URL externa (nao filehub), abre no navegador
+  if (!finalUrl.includes('filehub.space') && !finalUrl.includes('filehub.com.br')) {
+    console.log('URL externa - abrindo no navegador:', finalUrl);
+    shell.openExternal(finalUrl);
+    return;
+  }
+
+  // Adiciona token para autenticacao
+  if (currentSessionToken) {
+    const separator = finalUrl.includes('?') ? '&' : '?';
+    finalUrl = `${finalUrl}${separator}token=${encodeURIComponent(currentSessionToken)}`;
+  }
+
+  console.log('Carregando no app:', finalUrl);
+  mainWindow.loadURL(finalUrl);
+
+  // Injeta botao de voltar ao dashboard apos a pagina carregar
+  mainWindow.webContents.once('did-finish-load', () => {
+    injectBackButton();
+  });
+}
+
+// Injeta botao flutuante de voltar ao dashboard
+function injectBackButton() {
+  if (!mainWindow) return;
+
+  const backButtonCode = `
+    (function() {
+      // Remove botao existente se houver
+      const existing = document.getElementById('filehub-back-btn');
+      if (existing) existing.remove();
+
+      // Cria o botao
+      const btn = document.createElement('div');
+      btn.id = 'filehub-back-btn';
+      btn.innerHTML = \`
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        <span>Voltar</span>
+      \`;
+
+      // Estiliza o botao (degrade verde FileHub)
+      btn.style.cssText = \`
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 999999;
+        background: linear-gradient(135deg, #15997a 0%, #13312a 100%);
+        color: #fff;
+        border: none;
+        border-radius: 25px;
+        padding: 10px 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(21, 153, 122, 0.4);
+        transition: all 0.3s ease;
+      \`;
+
+      btn.onmouseenter = function() {
+        this.style.transform = 'scale(1.05)';
+        this.style.boxShadow = '0 6px 20px rgba(21, 153, 122, 0.5)';
+      };
+
+      btn.onmouseleave = function() {
+        this.style.transform = 'scale(1)';
+        this.style.boxShadow = '0 4px 15px rgba(21, 153, 122, 0.4)';
+      };
+
+      btn.onclick = function() {
+        // Usa protocolo especial para voltar ao dashboard
+        window.location.href = 'filehub://back-to-dashboard';
+      };
+
+      document.body.appendChild(btn);
+    })();
+  `;
+
+  mainWindow.webContents.executeJavaScript(backButtonCode).catch(err => {
+    console.error('Erro ao injetar botao de voltar:', err);
+  });
 }
 
 // Navega para a tela de login
@@ -1901,14 +2025,60 @@ ipcMain.handle('profile:update', async (event, data) => {
 // AUTO-UPDATER
 // =============================================
 
+// Dialog de atualizacao para Mac (download manual)
+async function showMacUpdateDialog(newVersion) {
+  const currentVersion = app.getVersion();
+
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    icon: path.join(__dirname, 'build', 'icon.png'),
+    title: 'Nova versao disponivel',
+    message: `FileHub ${newVersion} esta disponivel!`,
+    detail: `Voce esta usando a versao ${currentVersion}.\n\nComo seu Mac nao possui a versao assinada do app, a atualizacao precisa ser feita manualmente.\n\nClique em "Baixar agora" para abrir a pagina de download.`,
+    buttons: ['Baixar agora', 'Lembrar depois'],
+    defaultId: 0,
+    cancelId: 1
+  });
+
+  if (result.response === 0) {
+    // Abre a pagina de downloads
+    const downloadUrl = `https://github.com/LisboaCodes/filehub-app/releases/tag/v${newVersion}`;
+    shell.openExternal(downloadUrl);
+    console.log('Abrindo pagina de download:', downloadUrl);
+  } else {
+    console.log('Usuario optou por lembrar depois');
+  }
+}
+
 function setupAutoUpdater() {
   // NAO verifica automaticamente aqui - sera feito no splash
   // autoUpdater.checkForUpdates() - removido
 
-  // Atualizacao disponivel - inicia download automaticamente
+  // Atualizacao disponivel
   autoUpdater.on('update-available', (info) => {
     console.log('Atualizacao disponivel:', info.version);
 
+    // No Mac, mostra dialog para download manual (evita problemas com Gatekeeper)
+    if (process.platform === 'darwin') {
+      console.log('Mac detectado - mostrando notificacao de atualizacao manual');
+
+      // Envia para o splash ir para login (nao vai baixar automatico)
+      sendSplashStatus({ type: 'update-available-mac', version: info.version });
+
+      // Vai para login primeiro
+      if (!hasNavigatedToLogin) {
+        setTimeout(() => goToLoginFromSplash(), 1500);
+      }
+
+      // Depois de um tempo, mostra o dialog de atualizacao
+      setTimeout(() => {
+        showMacUpdateDialog(info.version);
+      }, 3000);
+
+      return;
+    }
+
+    // Windows: comportamento normal - baixa automaticamente
     // Envia para o splash
     sendSplashStatus({ type: 'update-available', version: info.version });
 
@@ -1998,7 +2168,15 @@ function setupAutoUpdater() {
 ipcMain.handle('update:check', async () => {
   try {
     const result = await autoUpdater.checkForUpdates();
-    return { success: true, version: result?.updateInfo?.version };
+    const newVersion = result?.updateInfo?.version;
+    const currentVersion = app.getVersion();
+
+    // Se tem atualizacao disponivel e e Mac, mostra dialog
+    if (newVersion && newVersion !== currentVersion && process.platform === 'darwin') {
+      setTimeout(() => showMacUpdateDialog(newVersion), 500);
+    }
+
+    return { success: true, version: newVersion, isMac: process.platform === 'darwin' };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -2019,6 +2197,35 @@ ipcMain.handle('update:install', () => {
 
 ipcMain.handle('app:getVersion', () => {
   return app.getVersion();
+});
+
+// Navega para uma pagina do app (gerenciada pelo admin)
+ipcMain.handle('app:goToPage', (event, pageNumber) => {
+  goToAppPage(pageNumber);
+  return { success: true };
+});
+
+// Retorna para o dashboard principal
+ipcMain.handle('app:goToDashboard', () => {
+  goToMainScreen();
+  return { success: true };
+});
+
+// Retorna a URL base do servidor
+ipcMain.handle('app:getServerUrl', () => {
+  return APP_SERVER_URL;
+});
+
+// Abre uma URL dentro do app (para capas do dashboard)
+ipcMain.handle('app:openUrl', (event, url) => {
+  openUrlInApp(url);
+  return { success: true };
+});
+
+// Volta para o dashboard local
+ipcMain.handle('app:backToDashboard', () => {
+  goToMainScreen();
+  return { success: true };
 });
 
 // =============================================
@@ -2368,6 +2575,19 @@ ipcMain.handle('dashboard:getCovers', async () => {
     return { success: true, data: covers };
   } catch (error) {
     console.error('Erro ao buscar covers:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Buscar capas do app (gerenciadas pelo admin em /admin/app-pages)
+ipcMain.handle('dashboard:getAppCovers', async () => {
+  try {
+    api.setAuthToken(currentSessionToken);
+    const result = await api.getAppCovers();
+    // A API já retorna {success, data}, então retornamos diretamente
+    return { success: true, data: result.data || [] };
+  } catch (error) {
+    console.error('Erro ao buscar app covers:', error);
     return { success: false, error: error.message };
   }
 });
