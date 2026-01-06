@@ -41,3 +41,4 @@ laravel/
 web.zip
 *.zip
 .claude/settings.local.json
+.claude/

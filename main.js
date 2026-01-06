@@ -594,12 +594,13 @@ function parseJsonCookies(data) {
       // Adiciona sameSite se disponivel
       if (c.sameSite) {
         // Converte para o formato que o Electron espera
+        // Electron so aceita: 'strict', 'lax', 'no_restriction'
         const sameSiteMap = {
           'strict': 'strict',
           'lax': 'lax',
           'no_restriction': 'no_restriction',
           'none': 'no_restriction',
-          'unspecified': 'unspecified'
+          'unspecified': 'lax' // Electron nao aceita 'unspecified', usa 'lax' como padrao
         };
         cookie.sameSite = sameSiteMap[c.sameSite.toLowerCase()] || 'lax';
       }
@@ -649,14 +650,30 @@ function decryptSessionShare(encryptedData, password = '') {
       return { success: false, error: 'Nenhum cookie valido encontrado no formato Netscape.' };
     }
 
-    // Se ja for JSON valido, retorna direto
-    if (data.startsWith('[') || data.startsWith('{')) {
-      const parsed = JSON.parse(data);
-      // Verifica se é formato {url, cookies} ou apenas [cookies]
-      if (parsed.cookies && parsed.url) {
-        return { success: true, cookies: parsed.cookies, url: parsed.url };
+    // Se ja for JSON valido (formato Cookie-Editor), parseia e extrai URL do dominio
+    if (isJsonCookiesFormat(data)) {
+      console.log('Detectado formato JSON (Cookie-Editor/Global Cookie Manager)');
+      const { cookies, detectedDomain } = parseJsonCookies(data);
+
+      if (cookies.length > 0) {
+        const url = detectedDomain ? `https://${detectedDomain}` : null;
+        console.log(`Parseados ${cookies.length} cookies do formato JSON. Dominio: ${detectedDomain}`);
+        return { success: true, cookies, url };
       }
-      return { success: true, cookies: parsed };
+
+      return { success: false, error: 'Nenhum cookie valido encontrado no formato JSON.' };
+    }
+
+    // Se for JSON com formato {url, cookies}, retorna direto
+    if (data.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed.cookies && parsed.url) {
+          return { success: true, cookies: parsed.cookies, url: parsed.url };
+        }
+      } catch (e) {
+        // Nao e JSON valido, continua para tentar descriptografar
+      }
     }
 
     // Chave de criptografia do FileHub
@@ -953,13 +970,25 @@ async function openSessionWindow(sessionData, ferramentaId = null) {
         const isHostCookie = cookie.name.startsWith('__Host-');
         const isSecureCookie = cookie.name.startsWith('__Secure-');
 
+        // Valida sameSite - Electron so aceita: 'strict', 'lax', 'no_restriction'
+        let sameSite = 'lax';
+        if (cookie.sameSite) {
+          const validSameSite = {
+            'strict': 'strict',
+            'lax': 'lax',
+            'no_restriction': 'no_restriction',
+            'none': 'no_restriction'
+          };
+          sameSite = validSameSite[cookie.sameSite.toLowerCase()] || 'lax';
+        }
+
         const cookieDetails = {
           url: sessionData.url,
           name: cookie.name,
           value: cookie.value,
           path: cookie.path || '/',
           httpOnly: cookie.httpOnly || false,
-          sameSite: cookie.sameSite || 'lax'
+          sameSite: sameSite
         };
 
         // __Host- cookies: sem domain, path=/, secure=true
