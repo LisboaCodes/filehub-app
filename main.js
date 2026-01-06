@@ -550,6 +550,78 @@ function isNetscapeFormat(data) {
   return validLines >= 3;
 }
 
+// Verifica se o texto esta no formato JSON (Cookie-Editor, Global Cookie Manager, etc)
+function isJsonCookiesFormat(data) {
+  try {
+    const trimmed = data.trim();
+    // Verifica se comeca com [ e termina com ]
+    if (!trimmed.startsWith('[') || !trimmed.endsWith(']')) {
+      return false;
+    }
+    const parsed = JSON.parse(trimmed);
+    // Verifica se e um array com pelo menos um objeto que tem 'name' e 'value'
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed[0].name !== undefined && parsed[0].value !== undefined;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Funcao para parsear cookies no formato JSON (Cookie-Editor, Global Cookie Manager, etc)
+function parseJsonCookies(data) {
+  try {
+    const parsed = JSON.parse(data.trim());
+    const cookies = [];
+    let detectedDomain = null;
+
+    for (const c of parsed) {
+      // Captura o dominio principal para construir a URL
+      if (!detectedDomain && c.domain) {
+        detectedDomain = c.domain.startsWith('.') ? c.domain.substring(1) : c.domain;
+      }
+
+      const cookie = {
+        name: c.name,
+        value: c.value,
+        domain: c.domain || '',
+        path: c.path || '/',
+        secure: c.secure === true,
+        httpOnly: c.httpOnly === true
+      };
+
+      // Adiciona sameSite se disponivel
+      if (c.sameSite) {
+        // Converte para o formato que o Electron espera
+        const sameSiteMap = {
+          'strict': 'strict',
+          'lax': 'lax',
+          'no_restriction': 'no_restriction',
+          'none': 'no_restriction',
+          'unspecified': 'unspecified'
+        };
+        cookie.sameSite = sameSiteMap[c.sameSite.toLowerCase()] || 'lax';
+      }
+
+      // Adiciona expiracao se disponivel e nao for sessao
+      if (c.expirationDate && !c.session) {
+        cookie.expirationDate = c.expirationDate;
+      }
+
+      cookies.push(cookie);
+    }
+
+    return {
+      cookies,
+      detectedDomain
+    };
+  } catch (e) {
+    console.error('Erro ao parsear cookies JSON:', e);
+    return { cookies: [], detectedDomain: null };
+  }
+}
+
 // Funcao para descriptografar dados do FileHub/Session Share
 function decryptSessionShare(encryptedData, password = '') {
   try {
@@ -1143,24 +1215,50 @@ ipcMain.handle('ferramentas:open', async (event, ferramenta) => {
       return { success: false, error: 'URL nao configurada' };
     }
 
-    // === TIPO: COOKIES_TXT (Netscape) - Parser especifico ===
+    // === TIPO: COOKIES_TXT - Aceita Netscape OU JSON (Cookie-Editor, Global Cookie Manager) ===
     if (tipoAcesso === 'cookies_txt') {
-      console.log('Processando formato Cookies.txt (Netscape)...');
+      console.log('Processando cookies (Netscape ou JSON)...');
 
-      if (!ferramenta.link_ou_conteudo || !isNetscapeFormat(ferramenta.link_ou_conteudo)) {
+      // Pega cookies do campo cookies_netscape OU link_ou_conteudo (fallback)
+      const cookiesContent = ferramenta.cookies_netscape || ferramenta.link_ou_conteudo;
+      console.log('Cookies content encontrado:', cookiesContent ? 'SIM' : 'NAO');
+
+      if (!cookiesContent) {
         const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
         return {
           success: false,
-          error: 'Cookies.txt nao configurado ou formato invalido',
+          error: 'Cookies nao configurados',
           needsSetup: true,
           isAdmin: isAdmin
         };
       }
 
-      const { cookies, detectedDomain } = parseNetscapeCookies(ferramenta.link_ou_conteudo);
+      let cookies = [];
+      let detectedDomain = null;
+
+      // Detecta o formato e parseia
+      if (isJsonCookiesFormat(cookiesContent)) {
+        console.log('Formato detectado: JSON (Cookie-Editor/Global Cookie Manager)');
+        const parsed = parseJsonCookies(cookiesContent);
+        cookies = parsed.cookies;
+        detectedDomain = parsed.detectedDomain;
+      } else if (isNetscapeFormat(cookiesContent)) {
+        console.log('Formato detectado: Netscape (cookies.txt)');
+        const parsed = parseNetscapeCookies(cookiesContent);
+        cookies = parsed.cookies;
+        detectedDomain = parsed.detectedDomain;
+      } else {
+        const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+        return {
+          success: false,
+          error: 'Formato de cookies invalido. Use Netscape (cookies.txt) ou JSON (Cookie-Editor)',
+          needsSetup: true,
+          isAdmin: isAdmin
+        };
+      }
 
       if (cookies.length === 0) {
-        return { success: false, error: 'Nenhum cookie valido encontrado no arquivo cookies.txt' };
+        return { success: false, error: 'Nenhum cookie valido encontrado' };
       }
 
       const url = detectedDomain ? `https://${detectedDomain}` : null;
@@ -1168,7 +1266,7 @@ ipcMain.handle('ferramentas:open', async (event, ferramenta) => {
         return { success: false, error: 'Nao foi possivel detectar o dominio dos cookies' };
       }
 
-      console.log(`Cookies.txt: ${cookies.length} cookies para ${url}`);
+      console.log(`Cookies: ${cookies.length} cookies para ${url}`);
 
       const sessionData = {
         id: `ferramenta-${ferramenta.id}`,
@@ -1178,6 +1276,47 @@ ipcMain.handle('ferramentas:open', async (event, ferramenta) => {
       };
 
       return await openSessionWindow(sessionData, ferramenta.id);
+    }
+
+    // === TIPO: SESSAO_APP - Admin faz login no app e salva sessao ===
+    if (tipoAcesso === 'sessao_app') {
+      console.log('Processando tipo sessao_app...');
+
+      // Se ja tem sessao salva, abre normalmente
+      if (ferramenta.link_ou_conteudo) {
+        const decrypted = decryptSessionShare(ferramenta.link_ou_conteudo);
+        if (decrypted.success) {
+          console.log('Sessao existente encontrada, abrindo...');
+          const sessionData = {
+            id: `ferramenta-${ferramenta.id}`,
+            name: ferramenta.titulo,
+            url: decrypted.url,
+            cookies: JSON.stringify(decrypted.cookies)
+          };
+          return await openSessionWindow(sessionData, ferramenta.id);
+        }
+      }
+
+      // Nao tem sessao, permite admin configurar
+      const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+      return {
+        success: false,
+        error: 'Sessao nao configurada',
+        needsSetup: true,
+        isAdmin: isAdmin,
+        urlLogin: ferramenta.url_login || null
+      };
+    }
+
+    // === TIPO: LOGIN_SENHA - Mostra modal com credenciais ===
+    if (tipoAcesso === 'login_senha') {
+      console.log('Tipo login_senha - retornando credenciais...');
+      return {
+        success: true,
+        type: 'credentials',
+        login: ferramenta.login || '',
+        senha: ferramenta.senha || ''
+      };
     }
 
     // === TIPO: SESSAO (Extensao FileHub) - Fluxo original sem modificacoes ===

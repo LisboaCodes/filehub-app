@@ -1952,7 +1952,29 @@ async function openFerramenta(ferramenta) {
 
         if (!result || !result.success) {
           if (result && result.needsSetup) {
-            alert('Esta ferramenta ainda nao foi configurada.\n\nA sessao sera configurada em breve.');
+            // Se for admin, oferece opcao de configurar
+            if (result.isAdmin) {
+              const urlLogin = result.urlLogin || null;
+              const mensagem = urlLogin
+                ? `Esta ferramenta ainda nao foi configurada.\n\nDeseja abrir a pagina de login para configurar?\n\nURL: ${urlLogin}`
+                : 'Esta ferramenta ainda nao foi configurada.\n\nDeseja abrir uma pagina para fazer login e configurar?';
+
+              if (confirm(mensagem)) {
+                // Pede URL se nao tiver
+                let url = urlLogin;
+                if (!url) {
+                  url = prompt('Digite a URL de login da ferramenta:');
+                  if (!url) return;
+                }
+                // Abre sessao em branco para configurar
+                const configResult = await window.api.openFerramentaBlank(ferramenta, url);
+                if (!configResult.success) {
+                  alert('Erro ao abrir: ' + configResult.error);
+                }
+              }
+            } else {
+              alert('Esta ferramenta ainda nao foi configurada.\n\nA sessao sera configurada em breve.');
+            }
           } else {
             alert('Erro ao abrir ferramenta: ' + (result?.error || 'Erro desconhecido'));
           }
