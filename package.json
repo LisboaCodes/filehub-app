@@ -1,6 +1,6 @@
 {
   "name": "filehub",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "FILEHUB - A MAIOR COMUNIDADE DE FERRAMENTAS DO BRASIL",
   "main": "main.js",
   "scripts": {

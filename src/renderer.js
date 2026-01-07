@@ -677,44 +677,6 @@ function setupTelegramPage() {
     return;
   }
 
-  // Mostra tela com tutorial e botao para abrir
-  container.innerHTML = `
-    <div class="telegram-container">
-      <div class="telegram-card telegram-tutorial">
-        <div class="telegram-header">
-          <span class="telegram-icon">&#128172;</span>
-          <h2>Telegram Web</h2>
-        </div>
-
-        <div class="telegram-info">
-          <p>Acesse o Telegram diretamente pelo FileHub usando sua conta pessoal.</p>
-          <p><strong>Sua sessao fica salva neste computador.</strong></p>
-        </div>
-
-        <div class="telegram-tutorial-box">
-          <h4>&#128736; Como fazer login:</h4>
-          <ol>
-            <li>Clique no botao <strong>"Abrir Telegram"</strong> abaixo</li>
-            <li>Abra o <strong>Telegram no seu celular</strong></li>
-            <li>Va em <strong>Configuracoes > Dispositivos > Conectar Dispositivo</strong></li>
-            <li>Escaneie o <strong>QR Code</strong> que aparece na tela</li>
-            <li>Pronto! Voce estara conectado</li>
-          </ol>
-        </div>
-
-        <div class="telegram-actions">
-          <button id="btnOpenTelegram" class="btn-open-telegram">
-            <span>&#9992;</span> Abrir Telegram
-          </button>
-        </div>
-
-        <div class="telegram-note">
-          <small>&#128274; Sua sessao e individual e segura - apenas voce tem acesso aos seus chats.</small>
-        </div>
-      </div>
-    </div>
-  `;
-
   // Funcao para abrir o Telegram
   async function abrirTelegram() {
     const btnOpen = document.getElementById('btnOpenTelegram');
@@ -725,8 +687,18 @@ function setupTelegramPage() {
 
     try {
       const result = await window.api.openTelegram();
-      if (!result.success && result.error) {
-        alert('Erro ao abrir Telegram: ' + result.error);
+      if (!result.success) {
+        if (result.needsSetup) {
+          // Sessao nao configurada - mostra mensagem apropriada
+          const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+          if (isAdmin) {
+            alert('Sessao do Telegram ainda nao foi configurada.\n\nFaca login no Telegram e depois va em:\nMenu > Sessao > Salvar Sessao (Compartilhar)');
+          } else {
+            alert('O Telegram ainda nao foi configurado pelo administrador.\n\nAguarde a configuracao.');
+          }
+        } else if (result.error) {
+          alert('Erro ao abrir Telegram: ' + result.error);
+        }
       }
     } catch (error) {
       console.error('Erro ao abrir Telegram:', error);
@@ -744,6 +716,11 @@ function setupTelegramPage() {
   if (btnOpen) {
     btnOpen.onclick = abrirTelegram;
   }
+
+  // Abre automaticamente ao entrar na pagina
+  setTimeout(() => {
+    abrirTelegram();
+  }, 300);
 }
 
 // Carrega dados do perfil
