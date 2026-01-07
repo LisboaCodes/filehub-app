@@ -1302,6 +1302,296 @@ ipcMain.handle('session:open', async (event, sessionData) => {
   return await openSessionWindow(sessionData);
 });
 
+// =============================================
+// TELEGRAM WEB - SESSAO COMPARTILHADA
+// =============================================
+
+// Janela do Telegram (referencia global para evitar multiplas janelas)
+let telegramWindow = null;
+const TELEGRAM_PARTITION = 'persist:telegram-shared';
+const TELEGRAM_URL = 'https://web.telegram.org/';
+
+// Busca sessao do Telegram salva no servidor
+async function getTelegramSession() {
+  try {
+    const response = await fetch(`${APP_SERVER_URL}/api/app-settings/telegram-session`, {
+      headers: {
+        'Authorization': `Bearer ${currentSessionToken}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.log('Nenhuma sessao do Telegram encontrada');
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.success && data.value) {
+      const decrypted = decryptSessionShare(data.value);
+      if (decrypted.success) {
+        return decrypted;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Erro ao buscar sessao do Telegram:', error);
+    return null;
+  }
+}
+
+// Salva sessao do Telegram no servidor (apenas admin)
+async function saveTelegramSession() {
+  if (!telegramWindow || telegramWindow.isDestroyed()) {
+    dialog.showErrorBox('Erro', 'Janela do Telegram nao encontrada');
+    return;
+  }
+
+  try {
+    const ses = session.fromPartition(TELEGRAM_PARTITION);
+    const currentUrl = telegramWindow.webContents.getURL();
+    const cookies = await ses.cookies.get({});
+
+    console.log('Salvando sessao do Telegram:', cookies.length, 'cookies');
+
+    // Criptografa os dados
+    const encrypted = encryptSessionShare(currentUrl, cookies);
+    if (!encrypted.success) {
+      dialog.showErrorBox('Erro', 'Erro ao criptografar sessao: ' + encrypted.error);
+      return;
+    }
+
+    // Salva no servidor
+    const response = await fetch(`${APP_SERVER_URL}/api/app-settings/telegram-session`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${currentSessionToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ value: encrypted.data })
+    });
+
+    if (response.ok) {
+      dialog.showMessageBox(telegramWindow, {
+        type: 'info',
+        title: 'Sessao Salva',
+        message: 'Sessao do Telegram salva com sucesso!',
+        detail: `${cookies.length} cookies foram salvos.\nTodos os usuarios agora poderao acessar esta sessao.`
+      });
+    } else {
+      const errorData = await response.json();
+      dialog.showErrorBox('Erro', 'Erro ao salvar sessao: ' + (errorData.message || 'Erro desconhecido'));
+    }
+  } catch (error) {
+    console.error('Erro ao salvar sessao do Telegram:', error);
+    dialog.showErrorBox('Erro', 'Erro ao salvar sessao: ' + error.message);
+  }
+}
+
+// Injeta cookies na sessao do Telegram
+async function injectTelegramCookies(sessionData) {
+  const ses = session.fromPartition(TELEGRAM_PARTITION);
+
+  // Limpa cookies anteriores
+  await ses.clearStorageData({ storages: ['cookies'] });
+
+  if (!sessionData.cookies || sessionData.cookies.length === 0) {
+    console.log('Nenhum cookie para injetar');
+    return;
+  }
+
+  console.log('Injetando', sessionData.cookies.length, 'cookies do Telegram');
+
+  for (const cookie of sessionData.cookies) {
+    try {
+      const isHostCookie = cookie.name.startsWith('__Host-');
+      const isSecureCookie = cookie.name.startsWith('__Secure-');
+
+      let sameSite = 'lax';
+      if (cookie.sameSite) {
+        const sameSiteMap = {
+          'strict': 'strict',
+          'lax': 'lax',
+          'none': 'no_restriction',
+          'no_restriction': 'no_restriction',
+          'unspecified': 'lax'
+        };
+        sameSite = sameSiteMap[cookie.sameSite.toLowerCase()] || 'lax';
+      }
+
+      const cookieDetails = {
+        url: `https://${cookie.domain?.replace(/^\./, '') || 'web.telegram.org'}${cookie.path || '/'}`,
+        name: cookie.name,
+        value: cookie.value,
+        path: cookie.path || '/',
+        secure: cookie.secure !== false,
+        httpOnly: cookie.httpOnly || false,
+        sameSite: sameSite
+      };
+
+      if (!isHostCookie && cookie.domain) {
+        cookieDetails.domain = cookie.domain;
+      }
+
+      if (cookie.expirationDate && cookie.expirationDate > 0) {
+        cookieDetails.expirationDate = cookie.expirationDate;
+      }
+
+      await ses.cookies.set(cookieDetails);
+    } catch (e) {
+      console.warn('Erro ao injetar cookie:', cookie.name, e.message);
+    }
+  }
+
+  console.log('Cookies do Telegram injetados com sucesso');
+}
+
+// Abre Telegram Web com sessao compartilhada
+async function openTelegramWindow() {
+  // Se ja existe janela do Telegram, foca nela
+  if (telegramWindow && !telegramWindow.isDestroyed()) {
+    telegramWindow.focus();
+    return { success: true };
+  }
+
+  const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+
+  // Busca sessao compartilhada do servidor
+  const sharedSession = await getTelegramSession();
+
+  // Se nao e admin e nao tem sessao, retorna erro
+  if (!isAdmin && !sharedSession) {
+    return {
+      success: false,
+      error: 'Sessao do Telegram ainda nao foi configurada. Aguarde o administrador configurar.',
+      needsSetup: true
+    };
+  }
+
+  // Cria janela do Telegram
+  telegramWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      partition: TELEGRAM_PARTITION
+    },
+    title: 'Telegram Web',
+    icon: path.join(__dirname, 'assets', 'icon.png')
+  });
+
+  // Limpa referencia quando fechar
+  telegramWindow.on('closed', () => {
+    telegramWindow = null;
+  });
+
+  // Menu do Telegram
+  const menuTemplate = [
+    {
+      label: 'Arquivo',
+      submenu: [
+        { role: 'close', label: 'Fechar' }
+      ]
+    }
+  ];
+
+  // Adiciona opcao de salvar sessao para admin
+  if (isAdmin) {
+    menuTemplate.push({
+      label: 'Sessao',
+      submenu: [
+        {
+          label: 'Salvar Sessao (Compartilhar)',
+          accelerator: 'CmdOrCtrl+S',
+          click: () => saveTelegramSession()
+        },
+        { type: 'separator' },
+        {
+          label: 'Limpar Sessao Local',
+          click: async () => {
+            const ses = session.fromPartition(TELEGRAM_PARTITION);
+            await ses.clearStorageData();
+            telegramWindow?.reload();
+            dialog.showMessageBox(telegramWindow, {
+              type: 'info',
+              title: 'Sessao Limpa',
+              message: 'Sessao local limpa. Faca login novamente.'
+            });
+          }
+        }
+      ]
+    });
+  }
+
+  menuTemplate.push(
+    {
+      label: 'Navegar',
+      submenu: [
+        {
+          label: 'Voltar',
+          accelerator: 'Alt+Left',
+          click: () => telegramWindow?.webContents.goBack()
+        },
+        {
+          label: 'Avancar',
+          accelerator: 'Alt+Right',
+          click: () => telegramWindow?.webContents.goForward()
+        },
+        {
+          label: 'Recarregar',
+          accelerator: 'F5',
+          click: () => telegramWindow?.webContents.reload()
+        },
+        { type: 'separator' },
+        {
+          label: 'Pagina Inicial',
+          click: () => telegramWindow?.loadURL(TELEGRAM_URL)
+        }
+      ]
+    },
+    {
+      label: 'Editar',
+      submenu: [
+        { role: 'undo', label: 'Desfazer' },
+        { role: 'redo', label: 'Refazer' },
+        { type: 'separator' },
+        { role: 'cut', label: 'Recortar' },
+        { role: 'copy', label: 'Copiar' },
+        { role: 'paste', label: 'Colar' },
+        { role: 'selectAll', label: 'Selecionar Tudo' }
+      ]
+    },
+    {
+      label: 'Visualizar',
+      submenu: [
+        { role: 'zoomIn', label: 'Aumentar Zoom' },
+        { role: 'zoomOut', label: 'Diminuir Zoom' },
+        { role: 'resetZoom', label: 'Zoom Padrao' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: 'Tela Cheia' }
+      ]
+    }
+  );
+
+  const menu = Menu.buildFromTemplate(menuTemplate);
+  telegramWindow.setMenu(menu);
+
+  // Se tem sessao compartilhada, injeta os cookies
+  if (sharedSession) {
+    await injectTelegramCookies(sharedSession);
+    console.log('Sessao compartilhada do Telegram carregada');
+  } else {
+    console.log('Admin abrindo Telegram para configurar sessao');
+  }
+
+  // Carrega Telegram Web
+  await telegramWindow.loadURL(TELEGRAM_URL);
+
+  return { success: true, isAdmin: isAdmin, hasSession: !!sharedSession };
+}
+
 // Abre URL externa no navegador padrao
 ipcMain.handle('shell:openExternal', async (event, url) => {
   try {
@@ -2220,6 +2510,16 @@ ipcMain.handle('app:getServerUrl', () => {
 ipcMain.handle('app:openUrl', (event, url) => {
   openUrlInApp(url);
   return { success: true };
+});
+
+// Abre Telegram Web com sessao persistente
+ipcMain.handle('telegram:open', async () => {
+  try {
+    return await openTelegramWindow();
+  } catch (error) {
+    console.error('Erro ao abrir Telegram:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // Volta para o dashboard local

@@ -591,6 +591,7 @@ function navigateTo(page) {
   document.getElementById('pageFerramentas').classList.add('hidden');
   document.getElementById('pageAcessos').classList.add('hidden');
   document.getElementById('pageMateriais').classList.add('hidden');
+  document.getElementById('pageTelegram')?.classList.add('hidden');
   document.getElementById('pageCanvaArquivos').classList.add('hidden');
   document.getElementById('pageCanvaAcesso').classList.add('hidden');
   document.getElementById('pagePerfil').classList.add('hidden');
@@ -614,6 +615,11 @@ function navigateTo(page) {
     document.getElementById('pageMateriais').classList.remove('hidden');
     pageTitleEl.textContent = 'Materiais';
     connectionStatus.classList.add('hidden');
+  } else if (page === 'telegram') {
+    document.getElementById('pageTelegram').classList.remove('hidden');
+    pageTitleEl.textContent = 'Telegram';
+    connectionStatus.classList.add('hidden');
+    setupTelegramPage();
   } else if (page === 'canva-arquivos') {
     document.getElementById('pageCanvaArquivos').classList.remove('hidden');
     pageTitleEl.textContent = 'Arquivos Canva';
@@ -635,6 +641,86 @@ function navigateTo(page) {
     connectionStatus.classList.add('hidden');
     loadProfileData();
   }
+}
+
+// =============================================
+// TELEGRAM PAGE
+// =============================================
+
+// Planos que tem acesso ao Telegram (IDs dos planos)
+// Ajuste conforme necessario
+const TELEGRAM_ALLOWED_PLANS = [2, 3, 4, 5, 6, 7, 8]; // Todos exceto plano 1 (gratuito)
+
+function setupTelegramPage() {
+  const container = document.getElementById('pageTelegram');
+  if (!container) return;
+
+  // Verifica se usuario tem acesso
+  const hasAccess = currentUser && TELEGRAM_ALLOWED_PLANS.includes(currentUser.plano_id);
+
+  if (!hasAccess) {
+    // Mostra tela de bloqueio
+    container.innerHTML = `
+      <div class="telegram-container">
+        <div class="telegram-card">
+          <div class="telegram-locked">
+            <div class="telegram-locked-icon">&#128274;</div>
+            <h3>Acesso Restrito</h3>
+            <p>O acesso ao Telegram esta disponivel apenas para planos pagos. Faca upgrade para desbloquear!</p>
+            <button class="btn-upgrade-telegram" onclick="navigateTo('planos')">
+              Ver Planos
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // Funcao para abrir o Telegram
+  async function abrirTelegram() {
+    const btnOpen = document.getElementById('btnOpenTelegram');
+    if (btnOpen) {
+      btnOpen.disabled = true;
+      btnOpen.innerHTML = '<span>&#8987;</span> Abrindo...';
+    }
+
+    try {
+      const result = await window.api.openTelegram();
+      if (!result.success) {
+        if (result.needsSetup) {
+          // Sessao nao configurada - mostra mensagem apropriada
+          const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+          if (isAdmin) {
+            alert('Sessao do Telegram ainda nao foi configurada.\n\nFaca login no Telegram e depois va em:\nMenu > Sessao > Salvar Sessao (Compartilhar)');
+          } else {
+            alert('O Telegram ainda nao foi configurado pelo administrador.\n\nAguarde a configuracao.');
+          }
+        } else {
+          alert('Erro ao abrir Telegram: ' + result.error);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao abrir Telegram:', error);
+      alert('Erro ao abrir Telegram');
+    }
+
+    if (btnOpen) {
+      btnOpen.disabled = false;
+      btnOpen.innerHTML = '<span>&#9992;</span> Abrir Telegram';
+    }
+  }
+
+  // Configura botao
+  const btnOpen = document.getElementById('btnOpenTelegram');
+  if (btnOpen) {
+    btnOpen.onclick = abrirTelegram;
+  }
+
+  // Abre automaticamente ao entrar na pagina
+  setTimeout(() => {
+    abrirTelegram();
+  }, 300);
 }
 
 // Carrega dados do perfil
@@ -2389,11 +2475,73 @@ function renderDashboardCovers() {
     card.addEventListener('click', () => {
       const url = card.dataset.url;
       if (url) {
-        // Abre a URL dentro do app (nao no navegador)
-        window.api.openUrlInApp(url);
+        // Verifica se e uma URL interna do app (app://)
+        if (url.startsWith('app://')) {
+          handleInternalNavigation(url);
+        } else {
+          // Abre a URL dentro do app (nao no navegador)
+          window.api.openUrlInApp(url);
+        }
       }
     });
   });
+}
+
+// Processa navegacao interna do app (URLs app://)
+// Formatos suportados:
+// - app://ferramentas - navega para ferramentas
+// - app://acessos - navega para acessos premium
+// - app://materiais - navega para materiais
+// - app://telegram - navega para Telegram
+// - app://canva-arquivos - navega para Arquivos Canva
+// - app://canva-arquivos?categoria=1 - navega para Arquivos Canva e filtra por categoria
+// - app://canva-acesso - navega para Acesso Canva
+// - app://planos - navega para planos
+// - app://perfil - navega para perfil
+function handleInternalNavigation(appUrl) {
+  try {
+    // Remove o prefixo app://
+    const urlWithoutPrefix = appUrl.replace('app://', '');
+
+    // Separa pagina e query params
+    const [page, queryString] = urlWithoutPrefix.split('?');
+
+    // Parse dos query params
+    const params = {};
+    if (queryString) {
+      queryString.split('&').forEach(param => {
+        const [key, value] = param.split('=');
+        params[key] = decodeURIComponent(value || '');
+      });
+    }
+
+    console.log('Navegacao interna:', page, params);
+
+    // Navega para a pagina
+    navigateTo(page);
+
+    // Aplica filtros especificos por pagina
+    setTimeout(() => {
+      if (page === 'canva-arquivos' && params.categoria) {
+        // Filtra por categoria no Canva Arquivos
+        currentCanvaCategoria = params.categoria;
+        renderCanvaCategoryFilter();
+        loadCanvaArquivos();
+      }
+
+      if (page === 'ferramentas' && params.busca) {
+        // Aplica busca nas ferramentas
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+          searchInput.value = params.busca;
+          searchInput.dispatchEvent(new Event('input'));
+        }
+      }
+    }, 100);
+
+  } catch (error) {
+    console.error('Erro na navegacao interna:', error);
+  }
 }
 
 // =============================================

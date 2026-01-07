@@ -196,6 +196,9 @@ contextBridge.exposeInMainWorld('api', {
   // Abre URL dentro do app (para capas do dashboard)
   openUrlInApp: (url) => ipcRenderer.invoke('app:openUrl', url),
 
+  // Abre Telegram Web com sessao persistente
+  openTelegram: () => ipcRenderer.invoke('telegram:open'),
+
   // Volta para o dashboard
   backToDashboard: () => ipcRenderer.invoke('app:backToDashboard'),
 
