@@ -1314,6 +1314,7 @@ const TELEGRAM_URL = 'https://web.telegram.org/';
 // Busca sessao do Telegram salva no servidor
 async function getTelegramSession() {
   try {
+    console.log('Buscando sessao do Telegram no servidor...');
     const response = await fetch(`${APP_SERVER_URL}/api/app-settings/telegram-session`, {
       headers: {
         'Authorization': `Bearer ${currentSessionToken}`,
@@ -1321,18 +1322,46 @@ async function getTelegramSession() {
       }
     });
 
+    console.log('Resposta do servidor - Status:', response.status);
+
     if (!response.ok) {
-      console.log('Nenhuma sessao do Telegram encontrada');
+      console.log('Nenhuma sessao do Telegram encontrada (status not ok)');
       return null;
     }
 
     const data = await response.json();
+    console.log('Dados recebidos:', data.success ? 'success=true' : 'success=false', 'value length:', data.value?.length || 0);
+
     if (data.success && data.value) {
+      // Verifica se e o novo formato (v2 com localStorage)
+      if (data.value.startsWith('telegram_session_v2 ')) {
+        console.log('Formato v2 detectado (com localStorage)');
+        try {
+          const base64Data = data.value.replace('telegram_session_v2 ', '');
+          const jsonData = Buffer.from(base64Data, 'base64').toString('utf-8');
+          const sessionData = JSON.parse(jsonData);
+          console.log('Sessao v2 recuperada! URL:', sessionData.url, 'Cookies:', sessionData.cookies?.length, 'localStorage items:', Object.keys(sessionData.localStorage || {}).length);
+          return {
+            success: true,
+            url: sessionData.url,
+            cookies: sessionData.cookies,
+            localStorage: sessionData.localStorage
+          };
+        } catch (e) {
+          console.error('Erro ao decodificar sessao v2:', e.message);
+        }
+      }
+
+      // Fallback para formato antigo (v1)
+      console.log('Tentando formato antigo (v1)...');
       const decrypted = decryptSessionShare(data.value);
+      console.log('Resultado descriptografia:', decrypted.success ? 'SUCESSO' : 'FALHA - ' + decrypted.error);
       if (decrypted.success) {
+        console.log('Sessao do Telegram recuperada! URL:', decrypted.url, 'Cookies:', decrypted.cookies?.length);
         return decrypted;
       }
     }
+    console.log('Nenhuma sessao valida encontrada');
     return null;
   } catch (error) {
     console.error('Erro ao buscar sessao do Telegram:', error);
@@ -1352,14 +1381,37 @@ async function saveTelegramSession() {
     const currentUrl = telegramWindow.webContents.getURL();
     const cookies = await ses.cookies.get({});
 
-    console.log('Salvando sessao do Telegram:', cookies.length, 'cookies');
-
-    // Criptografa os dados
-    const encrypted = encryptSessionShare(currentUrl, cookies);
-    if (!encrypted.success) {
-      dialog.showErrorBox('Erro', 'Erro ao criptografar sessao: ' + encrypted.error);
-      return;
+    // Extrai localStorage da pagina
+    let localStorageData = {};
+    try {
+      localStorageData = await telegramWindow.webContents.executeJavaScript(`
+        (() => {
+          const data = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            data[key] = localStorage.getItem(key);
+          }
+          return data;
+        })();
+      `);
+    } catch (e) {
+      console.warn('Erro ao extrair localStorage:', e.message);
     }
+
+    console.log('Salvando sessao do Telegram:', cookies.length, 'cookies,', Object.keys(localStorageData).length, 'localStorage items');
+
+    // Cria objeto com todos os dados da sessao
+    const sessionData = {
+      url: currentUrl,
+      cookies: cookies,
+      localStorage: localStorageData,
+      savedAt: Date.now()
+    };
+
+    // Criptografa usando Base64 simples (os dados ja sao JSON)
+    const jsonData = JSON.stringify(sessionData);
+    const base64Data = Buffer.from(jsonData).toString('base64');
+    const encryptedValue = 'telegram_session_v2 ' + base64Data;
 
     // Salva no servidor
     const response = await fetch(`${APP_SERVER_URL}/api/app-settings/telegram-session`, {
@@ -1369,7 +1421,7 @@ async function saveTelegramSession() {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      body: JSON.stringify({ value: encrypted.data })
+      body: JSON.stringify({ value: encryptedValue })
     });
 
     console.log('Resposta do servidor - Status:', response.status);
@@ -1592,6 +1644,33 @@ async function openTelegramWindow() {
   if (sharedSession) {
     await injectTelegramCookies(sharedSession);
     console.log('Sessao compartilhada do Telegram carregada');
+
+    // Injeta localStorage apos a pagina carregar
+    if (sharedSession.localStorage && Object.keys(sharedSession.localStorage).length > 0) {
+      telegramWindow.webContents.on('did-finish-load', async () => {
+        try {
+          const localStorageItems = sharedSession.localStorage;
+          const script = `
+            (() => {
+              const items = ${JSON.stringify(localStorageItems)};
+              for (const [key, value] of Object.entries(items)) {
+                localStorage.setItem(key, value);
+              }
+              console.log('localStorage restaurado:', Object.keys(items).length, 'items');
+              // Recarrega a pagina para aplicar a sessao
+              if (!window.__telegramSessionRestored) {
+                window.__telegramSessionRestored = true;
+                location.reload();
+              }
+            })();
+          `;
+          await telegramWindow.webContents.executeJavaScript(script);
+          console.log('localStorage do Telegram injetado:', Object.keys(localStorageItems).length, 'items');
+        } catch (e) {
+          console.warn('Erro ao injetar localStorage:', e.message);
+        }
+      });
+    }
   } else {
     console.log('Admin abrindo Telegram para configurar sessao');
   }
