@@ -12,8 +12,8 @@ const api = require('./src/api'); // API do FileHub
 // Entao desabilitamos e mostramos notificacao para download manual
 const isMac = process.platform === 'darwin';
 autoUpdater.autoDownload = !isMac; // Windows baixa automatico, Mac nao
-autoUpdater.autoInstallOnAppQuit = !isMac;
-autoUpdater.forceAppQuit = !isMac;
+autoUpdater.autoInstallOnAppQuit = false; // Controlamos manualmente
+autoUpdater.forceAppQuit = false; // Nao forca quit automatico
 
 // Usuario logado atualmente
 let currentUser = null;
@@ -1517,20 +1517,6 @@ async function openTelegramWindow() {
     return { success: true };
   }
 
-  const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
-
-  // Busca sessao compartilhada do servidor
-  const sharedSession = await getTelegramSession();
-
-  // Se nao e admin e nao tem sessao, retorna erro
-  if (!isAdmin && !sharedSession) {
-    return {
-      success: false,
-      error: 'Sessao do Telegram ainda nao foi configurada. Aguarde o administrador configurar.',
-      needsSetup: true
-    };
-  }
-
   // Cria janela do Telegram
   telegramWindow = new BrowserWindow({
     width: 1400,
@@ -1540,7 +1526,7 @@ async function openTelegramWindow() {
       contextIsolation: true,
       partition: TELEGRAM_PARTITION
     },
-    title: 'Telegram Web',
+    title: 'Telegram Web - FileHub',
     icon: path.join(__dirname, 'assets', 'icon.png')
   });
 
@@ -1556,22 +1542,12 @@ async function openTelegramWindow() {
       submenu: [
         { role: 'close', label: 'Fechar' }
       ]
-    }
-  ];
-
-  // Adiciona opcao de salvar sessao para admin
-  if (isAdmin) {
-    menuTemplate.push({
+    },
+    {
       label: 'Sessao',
       submenu: [
         {
-          label: 'Salvar Sessao (Compartilhar)',
-          accelerator: 'CmdOrCtrl+S',
-          click: () => saveTelegramSession()
-        },
-        { type: 'separator' },
-        {
-          label: 'Limpar Sessao Local',
+          label: 'Limpar Sessao e Relogar',
           click: async () => {
             const ses = session.fromPartition(TELEGRAM_PARTITION);
             await ses.clearStorageData();
@@ -1579,15 +1555,12 @@ async function openTelegramWindow() {
             dialog.showMessageBox(telegramWindow, {
               type: 'info',
               title: 'Sessao Limpa',
-              message: 'Sessao local limpa. Faca login novamente.'
+              message: 'Sessao local limpa. Faca login novamente com seu QR Code.'
             });
           }
         }
       ]
-    });
-  }
-
-  menuTemplate.push(
+    },
     {
       label: 'Navegar',
       submenu: [
@@ -1634,51 +1607,34 @@ async function openTelegramWindow() {
         { type: 'separator' },
         { role: 'togglefullscreen', label: 'Tela Cheia' }
       ]
+    },
+    {
+      label: 'Ajuda',
+      submenu: [
+        {
+          label: 'Como fazer login',
+          click: () => {
+            dialog.showMessageBox(telegramWindow, {
+              type: 'info',
+              title: 'Como fazer login no Telegram',
+              message: 'Para fazer login no Telegram Web:',
+              detail: '1. Abra o Telegram no seu celular\n2. Va em Configuracoes > Dispositivos > Conectar Dispositivo\n3. Escaneie o QR Code que aparece nesta tela\n4. Pronto! Sua sessao ficara salva neste computador.\n\nSua sessao e individual e segura - apenas voce tem acesso.'
+            });
+          }
+        }
+      ]
     }
-  );
+  ];
 
   const menu = Menu.buildFromTemplate(menuTemplate);
   telegramWindow.setMenu(menu);
 
-  // Se tem sessao compartilhada, injeta os cookies
-  if (sharedSession) {
-    await injectTelegramCookies(sharedSession);
-    console.log('Sessao compartilhada do Telegram carregada');
-
-    // Injeta localStorage apos a pagina carregar
-    if (sharedSession.localStorage && Object.keys(sharedSession.localStorage).length > 0) {
-      telegramWindow.webContents.on('did-finish-load', async () => {
-        try {
-          const localStorageItems = sharedSession.localStorage;
-          const script = `
-            (() => {
-              const items = ${JSON.stringify(localStorageItems)};
-              for (const [key, value] of Object.entries(items)) {
-                localStorage.setItem(key, value);
-              }
-              console.log('localStorage restaurado:', Object.keys(items).length, 'items');
-              // Recarrega a pagina para aplicar a sessao
-              if (!window.__telegramSessionRestored) {
-                window.__telegramSessionRestored = true;
-                location.reload();
-              }
-            })();
-          `;
-          await telegramWindow.webContents.executeJavaScript(script);
-          console.log('localStorage do Telegram injetado:', Object.keys(localStorageItems).length, 'items');
-        } catch (e) {
-          console.warn('Erro ao injetar localStorage:', e.message);
-        }
-      });
-    }
-  } else {
-    console.log('Admin abrindo Telegram para configurar sessao');
-  }
-
   // Carrega Telegram Web
   await telegramWindow.loadURL(TELEGRAM_URL);
 
-  return { success: true, isAdmin: isAdmin, hasSession: !!sharedSession };
+  console.log('Telegram Web aberto - usuario deve fazer login com QR Code');
+
+  return { success: true };
 }
 
 // Abre URL externa no navegador padrao
@@ -2648,26 +2604,10 @@ function setupAutoUpdater() {
       console.log('Iniciando instalacao da atualizacao...');
       sendSplashStatus({ type: 'installing' });
 
-      // Metodo mais seguro de instalar a atualizacao
-      setImmediate(() => {
-        try {
-          // Remove listeners de close de todas as janelas para evitar bloqueios
-          const allWindows = BrowserWindow.getAllWindows();
-          allWindows.forEach(win => {
-            win.removeAllListeners('close');
-            win.destroy();
-          });
-
-          // Usa quitAndInstall com parametros corretos
-          // isSilent = false (mostra instalador)
-          // isForceRunAfter = true (reinicia app apos instalacao)
-          autoUpdater.quitAndInstall(false, true);
-        } catch (err) {
-          console.error('Erro ao instalar update:', err);
-          // Fallback: forca saida do app
-          app.exit(0);
-        }
-      });
+      // Instala a atualizacao (isSilent=true para instalacao silenciosa, isForceRunAfter=true para reiniciar)
+      setTimeout(() => {
+        autoUpdater.quitAndInstall(true, true);
+      }, 500);
     }, 2000);
   });
 

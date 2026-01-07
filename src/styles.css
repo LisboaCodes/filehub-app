@@ -2608,3 +2608,111 @@ form {
   box-shadow: 0 8px 25px rgba(60, 228, 184, 0.3);
 }
 
+/* Telegram Tutorial Page */
+.telegram-tutorial {
+  max-width: 550px;
+}
+
+.telegram-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.telegram-header .telegram-icon {
+  font-size: 48px;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.telegram-header h2 {
+  font-size: 24px;
+  color: #fff;
+  margin: 0;
+}
+
+.telegram-info {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.telegram-info p {
+  color: #a0a0a0;
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+.telegram-info p strong {
+  color: #3ce4b8;
+}
+
+.telegram-tutorial-box {
+  background: rgba(0, 136, 204, 0.1);
+  border: 1px solid rgba(0, 136, 204, 0.3);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 25px;
+}
+
+.telegram-tutorial-box h4 {
+  color: #00a8e8;
+  font-size: 15px;
+  margin: 0 0 15px 0;
+}
+
+.telegram-tutorial-box ol {
+  margin: 0;
+  padding-left: 20px;
+  color: #ccc;
+}
+
+.telegram-tutorial-box ol li {
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.telegram-tutorial-box ol li strong {
+  color: #fff;
+}
+
+.telegram-actions {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.btn-open-telegram {
+  background: linear-gradient(135deg, #0088cc, #00a8e8);
+  color: #fff;
+  border: none;
+  padding: 16px 40px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-open-telegram:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(0, 136, 204, 0.4);
+}
+
+.btn-open-telegram:disabled {
+  background: #444;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.telegram-note {
+  text-align: center;
+}
+
+.telegram-note small {
+  color: #666;
+  font-size: 12px;
+}
+
