@@ -1372,6 +1372,10 @@ async function saveTelegramSession() {
       body: JSON.stringify({ value: encrypted.data })
     });
 
+    console.log('Resposta do servidor - Status:', response.status);
+    const responseText = await response.text();
+    console.log('Resposta do servidor - Body:', responseText);
+
     if (response.ok) {
       dialog.showMessageBox(telegramWindow, {
         type: 'info',
@@ -1380,8 +1384,14 @@ async function saveTelegramSession() {
         detail: `${cookies.length} cookies foram salvos.\nTodos os usuarios agora poderao acessar esta sessao.`
       });
     } else {
-      const errorData = await response.json();
-      dialog.showErrorBox('Erro', 'Erro ao salvar sessao: ' + (errorData.message || 'Erro desconhecido'));
+      let errorMsg = 'Erro desconhecido';
+      try {
+        const errorData = JSON.parse(responseText);
+        errorMsg = errorData.message || errorData.error || responseText;
+      } catch (e) {
+        errorMsg = responseText || `Status ${response.status}`;
+      }
+      dialog.showErrorBox('Erro', 'Erro ao salvar sessao: ' + errorMsg);
     }
   } catch (error) {
     console.error('Erro ao salvar sessao do Telegram:', error);
@@ -1836,6 +1846,151 @@ ipcMain.handle('acessosPremium:getAll', async () => {
 
 ipcMain.handle('acessosPremium:getById', async (event, id) => {
   return await getAcessoPremiumById(id);
+});
+
+// Abre acesso premium (mesma logica das ferramentas)
+ipcMain.handle('acessosPremium:open', async (event, acesso) => {
+  try {
+    console.log('=== ABRINDO ACESSO PREMIUM ===');
+    console.log('Titulo:', acesso.titulo);
+    console.log('Tipo acesso:', acesso.tipo_acesso);
+    console.log('Link/Conteudo (primeiros 100 chars):', acesso.link_ou_conteudo?.substring(0, 100));
+
+    const tipoAcesso = acesso.tipo_acesso || 'sessao';
+
+    // === TIPO: LINK - Abre URL diretamente no navegador ===
+    if (tipoAcesso === 'link') {
+      const url = acesso.link_ou_conteudo || acesso.url;
+      if (url) {
+        shell.openExternal(url);
+        return { success: true };
+      }
+      return { success: false, error: 'URL nao configurada' };
+    }
+
+    // === TIPO: COOKIES_TXT - Aceita Netscape OU JSON (Cookie-Editor, Global Cookie Manager) ===
+    if (tipoAcesso === 'cookies_txt') {
+      console.log('Processando cookies (Netscape ou JSON)...');
+
+      // Pega cookies do campo cookies_netscape OU link_ou_conteudo (fallback)
+      const cookiesContent = acesso.cookies_netscape || acesso.link_ou_conteudo;
+      console.log('Cookies content encontrado:', cookiesContent ? 'SIM' : 'NAO');
+
+      if (!cookiesContent) {
+        const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+        return {
+          success: false,
+          error: 'Cookies nao configurados',
+          needsSetup: true,
+          isAdmin: isAdmin
+        };
+      }
+
+      let cookies = [];
+      let detectedDomain = null;
+
+      // Detecta o formato e parseia
+      if (isJsonCookiesFormat(cookiesContent)) {
+        console.log('Formato detectado: JSON (Cookie-Editor/Global Cookie Manager)');
+        const parsed = parseJsonCookies(cookiesContent);
+        cookies = parsed.cookies;
+        detectedDomain = parsed.detectedDomain;
+      } else if (isNetscapeFormat(cookiesContent)) {
+        console.log('Formato detectado: Netscape (cookies.txt)');
+        const parsed = parseNetscapeCookies(cookiesContent);
+        cookies = parsed.cookies;
+        detectedDomain = parsed.detectedDomain;
+      } else {
+        const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+        return {
+          success: false,
+          error: 'Formato de cookies invalido. Use Netscape (cookies.txt) ou JSON (Cookie-Editor)',
+          needsSetup: true,
+          isAdmin: isAdmin
+        };
+      }
+
+      if (cookies.length === 0) {
+        return { success: false, error: 'Nenhum cookie valido encontrado' };
+      }
+
+      const url = detectedDomain ? `https://${detectedDomain}` : null;
+      if (!url) {
+        return { success: false, error: 'Nao foi possivel detectar o dominio dos cookies' };
+      }
+
+      console.log(`Cookies: ${cookies.length} cookies para ${url}`);
+
+      const sessionData = {
+        id: `acesso-premium-${acesso.id}`,
+        name: acesso.titulo,
+        url: url,
+        cookies: JSON.stringify(cookies)
+      };
+
+      return await openSessionWindow(sessionData, null);
+    }
+
+    // === TIPO: LOGIN_SENHA - Mostra modal com credenciais ===
+    if (tipoAcesso === 'login_senha') {
+      console.log('Tipo login_senha - retornando credenciais...');
+      return {
+        success: true,
+        type: 'credentials',
+        login: acesso.login || '',
+        senha: acesso.senha || ''
+      };
+    }
+
+    // === TIPO: SESSAO (Extensao FileHub) - Fluxo original sem modificacoes ===
+    const conteudo = acesso.link_ou_conteudo || acesso.chave_de_acesso;
+
+    if (!conteudo) {
+      const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+      return {
+        success: false,
+        error: 'Sessao nao configurada',
+        needsSetup: true,
+        isAdmin: isAdmin
+      };
+    }
+
+    const decrypted = decryptSessionShare(conteudo);
+
+    console.log('Resultado descriptografia:', decrypted.success ? 'SUCESSO' : 'FALHA');
+    if (decrypted.success) {
+      console.log('URL encontrada:', decrypted.url);
+      console.log('Cookies encontrados:', decrypted.cookies?.length || 0);
+    } else {
+      console.log('Erro:', decrypted.error);
+    }
+
+    if (!decrypted.success) {
+      // Se nao tem sessao e usuario e admin, retorna erro especial para permitir configurar
+      const isAdmin = currentUser && (currentUser.nivel_acesso === 'admin' || currentUser.plano_id === 8);
+      return {
+        success: false,
+        error: decrypted.error,
+        needsSetup: true,
+        isAdmin: isAdmin
+      };
+    }
+
+    // Cria a sessao com os dados
+    const sessionData = {
+      id: `acesso-premium-${acesso.id}`,
+      name: acesso.titulo,
+      url: decrypted.url,
+      cookies: JSON.stringify(decrypted.cookies)
+    };
+
+    console.log('Abrindo sessao para URL:', sessionData.url);
+
+    return await openSessionWindow(sessionData, null);
+  } catch (error) {
+    console.error('Erro ao abrir acesso premium:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // === TOOLS (MENUS) IPC ===

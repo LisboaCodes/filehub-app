@@ -985,9 +985,9 @@ function getBotaoAcessoPremium(acesso) {
 
       if (acesso.tipo_acesso === 'login_senha') {
         btnText = 'Ver Acesso';
-      } else if (acesso.tipo_acesso === 'link_url') {
+      } else if (acesso.tipo_acesso === 'link' || acesso.tipo_acesso === 'link_url') {
         btnText = 'Abrir Site';
-      } else if (acesso.tipo_acesso === 'chave_extensao') {
+      } else if (acesso.tipo_acesso === 'cookies_txt') {
         btnText = 'Acessar';
       }
 
@@ -1012,8 +1012,11 @@ function getBotaoAcessoPremium(acesso) {
 function getTipoAcessoLabel(tipo) {
   switch (tipo) {
     case 'login_senha': return 'Login/Senha';
+    case 'link':
     case 'link_url': return 'Link';
+    case 'sessao':
     case 'chave_extensao': return 'Sessao';
+    case 'cookies_txt': return 'Cookies';
     default: return tipo || 'Acesso';
   }
 }
@@ -1098,7 +1101,7 @@ function setupAcessosPremiumPage() {
   });
 }
 
-// Trata o clique no acesso premium baseado no tipo
+// Trata o clique no acesso premium (mesma logica das ferramentas)
 async function handleAcessoPremiumClick(acesso) {
   // Verifica se o usuario tem acesso
   if (!acesso.temAcesso) {
@@ -1112,86 +1115,67 @@ async function handleAcessoPremiumClick(acesso) {
     return;
   }
 
-  // Acao baseada no tipo de acesso
-  switch (acesso.tipo_acesso) {
-    case 'link_url':
-      // Abre a URL em uma nova aba externa
-      if (acesso.url) {
-        window.open(acesso.url, '_blank');
-      } else {
-        alert('URL nao configurada para este acesso.');
-      }
-      break;
-
-    case 'login_senha':
-      // Abre o modal com login/senha
-      showAcessoPremiumModal(acesso);
-      break;
-
-    case 'chave_extensao':
-      // Abre usando a extensao (mesma logica das ferramentas)
-      await openAcessoPremiumExtensao(acesso);
-      break;
-
-    default:
-      // Fallback - abre modal
-      showAcessoPremiumModal(acesso);
-      break;
-  }
-}
-
-// Abre acesso premium usando a extensao (igual ferramentas)
-async function openAcessoPremiumExtensao(acesso) {
   try {
     loadingOverlay.classList.add('active');
 
+    const tipoAcesso = acesso.tipo_acesso || 'sessao';
+
     console.log('Abrindo acesso premium:', acesso.titulo);
-    console.log('Tipo acesso:', acesso.tipo_acesso);
+    console.log('Tipo acesso:', tipoAcesso);
 
-    // Verifica se tem chave de acesso (dados criptografados)
-    const conteudo = acesso.chave_de_acesso || '';
+    // Comportamento baseado no tipo_acesso (igual ferramentas)
+    switch (tipoAcesso) {
+      case 'link':
+      case 'link_url':
+        // LINK: Apenas abre a URL no navegador
+        const url = acesso.link_ou_conteudo || acesso.url;
+        if (url && url.startsWith('http')) {
+          await window.api.openExternal(url);
+          loadingOverlay.classList.remove('active');
+        } else {
+          loadingOverlay.classList.remove('active');
+          alert('URL invalida. Peca ao administrador para configurar.');
+        }
+        return;
 
-    if (!conteudo) {
-      loadingOverlay.classList.remove('active');
-      alert('Chave de acesso nao configurada para este acesso.');
-      return;
-    }
+      case 'login_senha':
+        // LOGIN_SENHA: Mostra as credenciais para o usuario copiar
+        loadingOverlay.classList.remove('active');
+        showAcessoPremiumModal(acesso);
+        return;
 
-    // Verifica se é URL simples ou dados criptografados
-    const isEncrypted = conteudo.startsWith('filehub ') || conteudo.startsWith('session_paste ') || conteudo.startsWith('U2FsdGVk');
-    const isUrl = conteudo.startsWith('http://') || conteudo.startsWith('https://');
+      case 'sessao':
+      case 'cookies_txt':
+      case 'chave_extensao':
+      default:
+        // SESSAO/COOKIES_TXT: Usa a nova API igual ferramentas
+        const result = await window.api.openAcessoPremium(acesso);
 
-    if (isUrl && !isEncrypted) {
-      // É uma URL simples, abre direto
-      const result = await window.api.openSession({
-        id: `acesso-premium-${acesso.id}`,
-        name: acesso.titulo,
-        url: conteudo,
-        cookies: '[]'
-      });
-      loadingOverlay.classList.remove('active');
-      return;
-    }
+        console.log('Resultado openAcessoPremium:', result);
 
-    // É uma sessao criptografada, usa a mesma API das ferramentas
-    // Cria um objeto compativel com o formato de ferramenta
-    const ferramentaCompativel = {
-      id: acesso.id,
-      titulo: acesso.titulo,
-      link_ou_conteudo: conteudo
-    };
+        loadingOverlay.classList.remove('active');
 
-    const result = await window.api.openFerramenta(ferramentaCompativel);
-
-    loadingOverlay.classList.remove('active');
-
-    if (!result.success) {
-      alert('Erro ao abrir acesso: ' + result.error);
+        if (!result || !result.success) {
+          if (result && result.needsSetup) {
+            // Se for admin, oferece opcao de configurar
+            if (result.isAdmin) {
+              alert('Este acesso ainda nao foi configurado.\n\nConfigure a sessao ou cookies no painel admin.');
+            } else {
+              alert('Este acesso ainda nao foi configurado.\n\nA sessao sera configurada em breve.');
+            }
+          } else if (result && result.type === 'credentials') {
+            // Tipo login_senha retornado pelo backend
+            showAcessoPremiumModal(acesso);
+          } else {
+            alert('Erro ao abrir acesso: ' + (result?.error || 'Erro desconhecido'));
+          }
+        }
+        return;
     }
   } catch (error) {
     loadingOverlay.classList.remove('active');
-    console.error('Erro ao abrir acesso premium:', error);
-    alert('Erro ao abrir o acesso. Verifique os dados da sessao.');
+    console.error('Erro ao abrir acesso premium (catch):', error);
+    alert('Erro ao abrir o acesso: ' + error.message);
   }
 }
 

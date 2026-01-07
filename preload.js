@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('api', {
   // Acessos Premium do MySQL
   getAcessosPremium: () => ipcRenderer.invoke('acessosPremium:getAll'),
   getAcessoPremiumById: (id) => ipcRenderer.invoke('acessosPremium:getById', id),
+  openAcessoPremium: (acesso) => ipcRenderer.invoke('acessosPremium:open', acesso),
 
   // Tools (Menus) do MySQL
   getTools: () => ipcRenderer.invoke('tools:getAll'),
